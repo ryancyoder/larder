@@ -8,6 +8,7 @@ import { titleCase } from '../lib/match'
 import { db } from '../db/db'
 import { daysBetween, todayISO } from '../lib/dates'
 import { CatDot, Empty, Field, Section, Sheet } from '../components/ui'
+import QuickAdd from './QuickAdd'
 import { useToast } from '../app/toast'
 
 export default function Shop() {
@@ -20,6 +21,7 @@ export default function Shop() {
 
   const [draft, setDraft] = useState('')
   const [checkingOut, setCheckingOut] = useState(false)
+  const [walking, setWalking] = useState(false)
 
   const suggestions = useMemo(() => {
     if (!stock || !plan || !recipes || !list) return []
@@ -71,11 +73,14 @@ export default function Shop() {
             {sinceLast != null && ` · last shop ${sinceLast}d ago`}
           </div>
         </div>
-        {ticked.length > 0 && (
-          <button className="btn primary sm" onClick={() => setCheckingOut(true)}>
-            Check out {estimate > 0 && `· $${estimate.toFixed(0)}`}
-          </button>
-        )}
+        <div className="row" style={{ gap: 6 }}>
+          <button className="btn sm" onClick={() => setWalking(true)}>⚡ Quick add</button>
+          {ticked.length > 0 && (
+            <button className="btn primary sm" onClick={() => setCheckingOut(true)}>
+              Check out {estimate > 0 && `· $${estimate.toFixed(0)}`}
+            </button>
+          )}
+        </div>
       </div>
 
       <section className="section">
@@ -162,6 +167,8 @@ export default function Shop() {
       {checkingOut && (
         <CheckoutSheet items={ticked} onClose={() => setCheckingOut(false)} />
       )}
+
+      {walking && <QuickAdd onClose={() => setWalking(false)} />}
     </>
   )
 }

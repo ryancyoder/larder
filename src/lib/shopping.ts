@@ -129,6 +129,67 @@ export async function addGeneratedLines(lines: GeneratedLine[]) {
   )
 }
 
+// ---------------------------------------------------------------------------
+// Tap-to-add (the quick-add tile view)
+// ---------------------------------------------------------------------------
+
+/**
+ * Finds the list line that corresponds to a kitchen item. Prefers the explicit
+ * link, then falls back to the name — a line typed by hand shouldn't get
+ * duplicated just because it wasn't created from the item.
+ */
+export function findShopLine(list: ShopItem[], item: ItemView): ShopItem | undefined {
+  if (item.id != null) {
+    const linked = list.find((l) => l.itemId === item.id)
+    if (linked) return linked
+  }
+  const key = normalize(item.name)
+  return list.find((l) => normalize(l.name) === key)
+}
+
+export function shopQtyFor(list: ShopItem[], item: ItemView): number {
+  return findShopLine(list, item)?.qty ?? 0
+}
+
+/**
+ * How much to put on the list the first time you tap something. A staple knows
+ * how much it's short of its par level; anything else is just one.
+ */
+function firstTapQty(item: ItemView): number {
+  if (item.isStaple && item.parQty) {
+    const gap = item.parQty - item.available
+    if (gap > 0) return Math.max(1, Math.round(gap * 100) / 100)
+  }
+  return 1
+}
+
+/** Adds one tap's worth. Returns the line's new quantity. */
+export async function bumpShopLine(item: ItemView, list: ShopItem[]): Promise<number> {
+  const existing = findShopLine(list, item)
+  if (existing?.id != null) {
+    const next = Math.round((existing.qty + 1) * 100) / 100
+    await db.shop.update(existing.id, { qty: next })
+    return next
+  }
+  const qty = firstTapQty(item)
+  await db.shop.add({
+    name: item.name,
+    qty,
+    unit: item.unit,
+    category: item.category,
+    checked: false,
+    source: 'manual',
+    reason: item.available <= 0 ? 'Out of stock' : 'Added while walking the kitchen',
+    itemId: item.id,
+  })
+  return qty
+}
+
+export async function clearShopLine(item: ItemView, list: ShopItem[]): Promise<void> {
+  const existing = findShopLine(list, item)
+  if (existing?.id != null) await db.shop.delete(existing.id)
+}
+
 export interface CheckoutInput {
   store: string
   /** Per-line price the user typed at the till, keyed by shop-item id. */

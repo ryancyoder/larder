@@ -25,6 +25,23 @@ either.
 
 One-time setup on the repo: **Settings → Pages → Source → GitHub Actions.**
 
+## Quick add — walking the kitchen
+
+**Shop → ⚡ Quick add** opens a full-screen, chrome-free tile grid built for one thumb and a
+kitchen door held open. Locations first, like photo albums; tap one and you get every item in
+that place as a big square tile. Tap a tile to put it on the shopping list, tap again to add
+another, and the ✕ clears it.
+
+The first tap is smarter than "add one": a staple that's short of its par level goes on at the
+gap. Eight eggs against a par of twelve puts **4** on the list, not 1.
+
+Tiles show what you need to decide at a glance and nothing else — the item's photo (or its
+category icon), what's left, and a corner flag for *low* or *3d* when something's near its date.
+Filter by All / Low / Expiring / Staples, sort by A–Z / Emptiest / Soonest, or search.
+
+It writes to the same shopping list as everything else, and reflects what's already on it, so
+you can walk the kitchen in several passes without double-adding.
+
 ## Storage locations
 
 **Settings → Storage locations** — the five defaults (Fridge, Freezer, Pantry, Counter, Spices)
