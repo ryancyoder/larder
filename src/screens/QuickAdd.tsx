@@ -20,6 +20,17 @@ import { Seg } from '../components/ui'
 
 type Filter = 'all' | 'low' | 'expiring' | 'staples'
 type Sort = 'name' | 'low' | 'expiring'
+type TileSize = 'regular' | 'large'
+
+const SIZE_KEY = 'larder-tile-size'
+
+function readSize(): TileSize {
+  try {
+    return localStorage.getItem(SIZE_KEY) === 'large' ? 'large' : 'regular'
+  } catch {
+    return 'regular'
+  }
+}
 
 const FILTERS: Array<{ value: Filter; label: string }> = [
   { value: 'all', label: 'All' },
@@ -59,6 +70,17 @@ export default function QuickAdd({ onClose }: { onClose: () => void }) {
   const [filter, setFilter] = useState<Filter>('all')
   const [sort, setSort] = useState<Sort>('name')
   const [query, setQuery] = useState('')
+  const [size, setSize] = useState<TileSize>(readSize)
+
+  function toggleSize() {
+    const next: TileSize = size === 'regular' ? 'large' : 'regular'
+    setSize(next)
+    try {
+      localStorage.setItem(SIZE_KEY, next)
+    } catch {
+      // Not persisting is survivable — the session still respects the choice.
+    }
+  }
 
   const place = places?.find((p) => p.key === placeKey)
   const basket = list?.filter((l) => !l.checked).length ?? 0
@@ -105,6 +127,15 @@ export default function QuickAdd({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
+        {/* Labelled with what it switches to, so the toggle needs no legend. */}
+        <button
+          className="pos-size"
+          onClick={toggleSize}
+          aria-label={size === 'regular' ? 'Switch to large tiles' : 'Switch to regular tiles'}
+        >
+          {size === 'regular' ? 'Big' : 'Small'}
+        </button>
+
         <button className="pos-back" onClick={onClose} aria-label="Close quick add">✕</button>
       </header>
 
@@ -119,7 +150,7 @@ export default function QuickAdd({ onClose }: { onClose: () => void }) {
         </div>
       )}
 
-      <div className="pos-grid">
+      <div className={`pos-grid${size === 'large' ? ' large' : ''}`}>
         {!placeKey ? (
           <>
             {places.map((p) => (
@@ -161,8 +192,10 @@ function PlaceTile({ place, items, onOpen }: { place: StoragePlace; items: ItemV
   return (
     <button className="pos-tile" onClick={onOpen}>
       <span className="pos-glyph">{place.emoji}</span>
-      <span className="pos-name">{place.label}</span>
-      <span className="pos-meta">{mine.length} items</span>
+      <span className="pos-label">
+        <span className="pos-name">{place.label}</span>
+        <span className="pos-meta">{mine.length} items</span>
+      </span>
       {low > 0 && <span className="pos-flag">{low} low</span>}
     </button>
   )
@@ -177,17 +210,20 @@ function ItemTile({ item, qty, list }: { item: ItemView; qty: number; list: Para
   return (
     <div className="pos-tile-wrap">
       <button
-        className={`pos-tile${qty > 0 ? ' on' : ''}`}
+        className={`pos-tile${qty > 0 ? ' on' : ''}${photo ? ' has-photo' : ''}`}
         onClick={() => bumpShopLine(item, list)}
         aria-label={`Add ${item.name} to the shopping list`}
       >
         {photo
-          ? <img className="pos-photo" src={photo} alt="" loading="lazy" />
+          ? <img className="pos-fill" src={photo} alt="" loading="lazy" />
           : <span className="pos-glyph">{meta.emoji}</span>}
 
-        <span className="pos-name">{item.name}</span>
-        <span className="pos-meta">
-          {item.available <= 0 ? 'Out' : formatAmount(item.available, item.unit)}
+        {/* On a photo tile this becomes a scrimmed caption pinned to the bottom. */}
+        <span className="pos-label">
+          <span className="pos-name">{item.name}</span>
+          <span className="pos-meta">
+            {item.available <= 0 ? 'Out' : formatAmount(item.available, item.unit)}
+          </span>
         </span>
 
         {qty === 0 && low && <span className="pos-flag">low</span>}
