@@ -126,14 +126,14 @@ export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void
       ) : grouped ? (
         grouped.map((g) => (
           <Section key={g.loc.key} title={`${g.loc.emoji} ${g.loc.label}`} hint={g.loc.blurb}>
-            <div className="stack">
+            <div className="stack auto-cols">
               {g.items.map((item, i) => <ItemRow key={item.id} item={item} index={i} onClick={() => setSelected(item)} />)}
             </div>
           </Section>
         ))
       ) : (
         <div className="section">
-          <div className="stack">
+          <div className="stack auto-cols">
             {visible.map((item, i) => <ItemRow key={item.id} item={item} index={i} onClick={() => setSelected(item)} />)}
           </div>
         </div>

@@ -7,12 +7,14 @@ import { bandOf, rankRecipes } from '../lib/suggest'
 import { db } from '../db/db'
 import { Empty, Section, Sheet } from '../components/ui'
 import { useToast } from '../app/toast'
+import { useLayout } from '../app/layout'
 
 export default function Plan() {
   const stock = useKitchen()
   const plan = usePlan()
   const recipes = useRecipes()
   const toast = useToast()
+  const { resolved } = useLayout()
 
   const [weekOffset, setWeekOffset] = useState(0)
   const [picking, setPicking] = useState<{ date: string; slot: MealSlot } | null>(null)
@@ -35,6 +37,11 @@ export default function Plan() {
     () => new Map((recipes ?? []).filter((r) => r.id).map((r) => [r.id!, r])),
     [recipes],
   )
+
+  const entriesFor = (date: string) =>
+    (byDay.get(date) ?? []).sort(
+      (a, b) => SLOTS.findIndex((s) => s.key === a.slot) - SLOTS.findIndex((s) => s.key === b.slot),
+    )
 
   if (!stock || !plan || !recipes) return null
 
@@ -63,77 +70,32 @@ export default function Plan() {
         </div>
       </div>
 
-      {days.map((date) => {
-        const entries = (byDay.get(date) ?? []).sort(
-          (a, b) => SLOTS.findIndex((s) => s.key === a.slot) - SLOTS.findIndex((s) => s.key === b.slot),
-        )
-        const isToday = date === todayISO()
-
-        return (
-          <section className="section" key={date} style={{ marginTop: 18 }}>
-            <div className="row" style={{ marginBottom: 9, gap: 10 }}>
-              <div
-                style={{
-                  flex: 'none', width: 44, textAlign: 'center', padding: '5px 0', borderRadius: 12,
-                  background: isToday ? 'var(--accent)' : 'var(--bg-2)',
-                  color: isToday ? 'var(--accent-ink)' : 'var(--text-dim)',
-                  border: isToday ? 'none' : '1px solid var(--line)',
-                }}
-              >
-                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.85 }}>
-                  {weekdayShort(date)}
-                </div>
-                <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-0.03em' }}>{dayNum(date)}</div>
-              </div>
-
-              <div className="stack" style={{ flex: 1, gap: 6 }}>
-                {entries.length === 0 && (
-                  <button
-                    className="btn ghost sm"
-                    style={{ justifyContent: 'flex-start', width: '100%', borderStyle: 'dashed' }}
-                    onClick={() => setPicking({ date, slot: 'dinner' })}
-                  >
-                    + Plan something
-                  </button>
-                )}
-
-                {entries.map((entry) => {
-                  const slot = SLOTS.find((s) => s.key === entry.slot)!
-                  const done = entry.status !== 'planned'
-                  return (
-                    <button
-                      key={entry.id}
-                      className="item"
-                      style={{ padding: '9px 12px', opacity: done ? 0.55 : 1 }}
-                      onClick={() => setActing(entry)}
-                    >
-                      <span style={{ fontSize: 17, flex: 'none' }}>{slot.emoji}</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div className="name" style={{ fontSize: 14, textDecoration: entry.status === 'skipped' ? 'line-through' : undefined }}>
-                          {entry.title}
-                        </div>
-                        <div className="meta">
-                          <span>{slot.label}</span>
-                          <span>·</span>
-                          <span>{entry.servings} servings</span>
-                          {entry.status === 'cooked' && <span className="chip tone-fresh"><span className="dot" />cooked</span>}
-                          {entry.status === 'skipped' && <span className="chip"><span className="dot" />skipped</span>}
-                        </div>
-                      </div>
-                    </button>
-                  )
-                })}
-
-                {entries.length > 0 && (
-                  <button className="btn ghost sm" style={{ alignSelf: 'flex-start' }} onClick={() => setPicking({ date, slot: 'dinner' })}>
-                    + Add another
-                  </button>
-                )}
-              </div>
-            </div>
-          </section>
-        )
-      })}
+      {resolved === 'wide' ? (
+        // Landscape: the week as an actual week, seven columns across.
+        <section className="section">
+          <div className="week-grid">
+            {days.map((date) => (
+              <DayColumn
+                key={date}
+                date={date}
+                entries={entriesFor(date)}
+                onAdd={() => setPicking({ date, slot: 'dinner' })}
+                onOpen={setActing}
+              />
+            ))}
+          </div>
+        </section>
+      ) : (
+        days.map((date) => (
+          <DayRow
+            key={date}
+            date={date}
+            entries={entriesFor(date)}
+            onAdd={() => setPicking({ date, slot: 'dinner' })}
+            onOpen={setActing}
+          />
+        ))
+      )}
 
       {weekEntries.length === 0 && (
         <Section title="Why plan?">
@@ -203,6 +165,158 @@ export default function Plan() {
         </Sheet>
       )}
     </>
+  )
+}
+
+interface DayProps {
+  date: string
+  entries: PlanEntry[]
+  onAdd: () => void
+  onOpen: (entry: PlanEntry) => void
+}
+
+/** One scheduled meal. Shared by both layouts so they can't drift apart. */
+function MealCard({ entry, compact, onOpen }: { entry: PlanEntry; compact: boolean; onOpen: () => void }) {
+  const slot = SLOTS.find((s) => s.key === entry.slot)!
+  const done = entry.status !== 'planned'
+  return (
+    <button
+      className="item"
+      style={{
+        padding: compact ? '9px 12px' : '9px 10px',
+        opacity: done ? 0.55 : 1,
+        alignItems: compact ? 'center' : 'flex-start',
+        gap: compact ? 10 : 8,
+      }}
+      onClick={onOpen}
+    >
+      {/* The emoji costs ~23px of a ~118px column, and the slot name below
+          already says which meal it is — so it only earns its place in the
+          roomier compact layout. */}
+      {compact && <span style={{ fontSize: 17, flex: 'none' }}>{slot.emoji}</span>}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          className="name"
+          style={{
+            fontSize: compact ? 14 : 12.5,
+            lineHeight: 1.3,
+            textDecoration: entry.status === 'skipped' ? 'line-through' : undefined,
+            ...(compact ? {} : {
+              display: '-webkit-box',
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: 'vertical' as const,
+              overflow: 'hidden',
+            }),
+          }}
+          title={entry.title}
+        >
+          {entry.title}
+        </div>
+        <div className="meta">
+          <span>{slot.label}</span>
+          {compact && <><span>·</span><span>{entry.servings} servings</span></>}
+          {entry.status === 'cooked' && <span className="chip tone-fresh"><span className="dot" />cooked</span>}
+          {entry.status === 'skipped' && <span className="chip"><span className="dot" />skipped</span>}
+        </div>
+      </div>
+    </button>
+  )
+}
+
+/** Compact layout: a horizontal row per day, stacked down the screen. */
+function DayRow({ date, entries, onAdd, onOpen }: DayProps) {
+  const isToday = date === todayISO()
+  return (
+    <section className="section" style={{ marginTop: 18 }}>
+      <div className="row" style={{ marginBottom: 9, gap: 10, alignItems: 'flex-start' }}>
+        <DayBadge date={date} isToday={isToday} />
+        <div className="stack" style={{ flex: 1, gap: 6 }}>
+          {entries.length === 0 && (
+            <button
+              className="btn ghost sm"
+              style={{ justifyContent: 'flex-start', width: '100%', borderStyle: 'dashed' }}
+              onClick={onAdd}
+            >
+              + Plan something
+            </button>
+          )}
+          {entries.map((entry) => (
+            <MealCard key={entry.id} entry={entry} compact onOpen={() => onOpen(entry)} />
+          ))}
+          {entries.length > 0 && (
+            <button className="btn ghost sm" style={{ alignSelf: 'flex-start' }} onClick={onAdd}>
+              + Add another
+            </button>
+          )}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/** Wide layout: a vertical column per day, seven side by side. */
+function DayColumn({ date, entries, onAdd, onOpen }: DayProps) {
+  const isToday = date === todayISO()
+  return (
+    <div
+      className="card"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 6,
+        padding: 8,
+        minHeight: 190,
+        background: isToday ? 'var(--accent-soft)' : 'var(--bg-1)',
+        borderColor: isToday ? 'var(--accent)' : 'var(--line)',
+      }}
+    >
+      <div style={{ textAlign: 'center', paddingBottom: 2 }}>
+        <div style={{
+          fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em',
+          color: isToday ? 'var(--accent)' : 'var(--text-mute)',
+        }}>
+          {weekdayShort(date)}
+        </div>
+        <div style={{
+          fontSize: 19, fontWeight: 700, letterSpacing: '-0.03em',
+          color: isToday ? 'var(--accent)' : 'var(--text)',
+        }}>
+          {dayNum(date)}
+        </div>
+      </div>
+
+      {entries.map((entry) => (
+        <MealCard key={entry.id} entry={entry} compact={false} onOpen={() => onOpen(entry)} />
+      ))}
+
+      {/* Sits at the bottom of every column so the + buttons line up across the week. */}
+      <button
+        className="btn ghost sm"
+        style={{ marginTop: 'auto', width: '100%', borderStyle: 'dashed', padding: '7px 6px' }}
+        onClick={onAdd}
+        aria-label={`Plan a meal for ${date}`}
+      >
+        +
+      </button>
+    </div>
+  )
+}
+
+function DayBadge({ date, isToday }: { date: string; isToday: boolean }) {
+  return (
+    <div
+      style={{
+        flex: 'none', width: 44, textAlign: 'center', padding: '5px 0', borderRadius: 12,
+        background: isToday ? 'var(--accent)' : 'var(--bg-2)',
+        color: isToday ? 'var(--accent-ink)' : 'var(--text-dim)',
+        border: isToday ? 'none' : '1px solid var(--line)',
+      }}
+    >
+      <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.85 }}>
+        {weekdayShort(date)}
+      </div>
+      <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-0.03em' }}>{dayNum(date)}</div>
+    </div>
   )
 }
 

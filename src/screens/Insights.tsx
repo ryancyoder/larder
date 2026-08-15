@@ -79,7 +79,7 @@ export default function Insights({ onOpenSettings }: { onOpenSettings: () => voi
       </section>
 
       <section className="section">
-        <div className="grid-2">
+        <div className="grid-2 stat-grid">
           <Stat
             label="Wasted"
             value={money(head.wasteThisMonth)}
@@ -111,6 +111,8 @@ export default function Insights({ onOpenSettings }: { onOpenSettings: () => voi
         </div>
       </Section>
 
+      {/* Paired side by side in wide mode — both are ranked bars of the same shape. */}
+      <div className="chart-grid">
       <Section title="Where the money goes" hint="last 3 months">
         <div className="card card-pad">
           <RankedBars
@@ -123,21 +125,6 @@ export default function Insights({ onOpenSettings }: { onOpenSettings: () => voi
             format={money}
             emptyLabel="Log some prices at checkout and this fills in."
           />
-        </div>
-      </Section>
-
-      <Section title="How often you shop" hint="days between trips">
-        <div className="card card-pad">
-          <IntervalLine points={shopping.intervals.slice(-14)} average={shopping.avgIntervalDays} />
-          {shopping.avgIntervalDays != null && (
-            <p style={{ fontSize: 12.5, color: 'var(--text-mute)', marginTop: 10 }}>
-              You shop every <strong style={{ color: 'var(--text-dim)' }}>{shopping.avgIntervalDays} days</strong> —
-              about {(30 / Math.max(1, shopping.avgIntervalDays)).toFixed(1)} trips a month at {money(shopping.avgBasket)} each,
-              or roughly {money((30 / Math.max(1, shopping.avgIntervalDays)) * shopping.avgBasket)} a month.
-              Fewer trips only costs less if the bigger baskets get eaten — stretch the gap and watch the waste
-              figure above to see whether it actually worked.
-            </p>
-          )}
         </div>
       </Section>
 
@@ -162,10 +149,26 @@ export default function Insights({ onOpenSettings }: { onOpenSettings: () => voi
           )}
         </div>
       </Section>
+      </div>
+
+      <Section title="How often you shop" hint="days between trips">
+        <div className="card card-pad">
+          <IntervalLine points={shopping.intervals.slice(-14)} average={shopping.avgIntervalDays} />
+          {shopping.avgIntervalDays != null && (
+            <p style={{ fontSize: 12.5, color: 'var(--text-mute)', marginTop: 10 }}>
+              You shop every <strong style={{ color: 'var(--text-dim)' }}>{shopping.avgIntervalDays} days</strong> —
+              about {(30 / Math.max(1, shopping.avgIntervalDays)).toFixed(1)} trips a month at {money(shopping.avgBasket)} each,
+              or roughly {money((30 / Math.max(1, shopping.avgIntervalDays)) * shopping.avgBasket)} a month.
+              Fewer trips only costs less if the bigger baskets get eaten — stretch the gap and watch the waste
+              figure above to see whether it actually worked.
+            </p>
+          )}
+        </div>
+      </Section>
 
       {shopping.recent.length > 0 && (
         <Section title="Recent trips">
-          <div className="stack" style={{ gap: 6 }}>
+          <div className="stack auto-cols" style={{ gap: 6 }}>
             {shopping.recent.map((t) => (
               <div className="item" key={t.id} style={{ padding: '9px 12px' }}>
                 <span style={{ fontSize: 17, flex: 'none' }}>🧾</span>

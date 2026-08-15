@@ -14,6 +14,23 @@
     <!-- Safari won't use an SVG for the home-screen icon; it needs a PNG. -->
     <link rel="apple-touch-icon" href="./icon-180.png" />
     <title>Larder</title>
+    <script>
+      // Resolve theme and layout before first paint, so the app doesn't flash
+      // the wrong one while React boots.
+      (function () {
+        try {
+          var root = document.documentElement
+          var theme = localStorage.getItem('larder-theme')
+          if (theme === 'light' || theme === 'dark') root.dataset.theme = theme
+          var mode = localStorage.getItem('larder-layout') || 'auto'
+          root.dataset.layout =
+            mode === 'auto' ? (window.innerWidth >= 940 ? 'wide' : 'compact') : mode
+        } catch (e) {
+          document.documentElement.dataset.layout =
+            window.innerWidth >= 940 ? 'wide' : 'compact'
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

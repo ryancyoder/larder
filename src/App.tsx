@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { seedIfEmpty } from './db/seed'
 import { ToastProvider } from './app/toast'
+import { LayoutProvider } from './app/layout'
 import { useKitchen, useShopList } from './app/data'
 import { expiringSoon } from './lib/inventory'
 import Kitchen from './screens/Kitchen'
@@ -43,12 +44,6 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
 
-  useEffect(() => {
-    // Restore the saved theme before first paint of the shell.
-    const saved = localStorage.getItem('larder-theme')
-    if (saved === 'light' || saved === 'dark') document.documentElement.dataset.theme = saved
-  }, [])
-
   const go = (next: Tab) => {
     setTab(next)
     window.location.hash = next
@@ -61,6 +56,7 @@ export default function App() {
   const badges: Partial<Record<Tab, number>> = { kitchen: urgentCount, shop: shopCount }
 
   return (
+    <LayoutProvider>
     <ToastProvider>
       <div className="app">
         <nav className="nav" aria-label="Sections">
@@ -99,5 +95,6 @@ export default function App() {
 
       {settingsOpen && <Settings onClose={() => setSettingsOpen(false)} />}
     </ToastProvider>
+    </LayoutProvider>
   )
 }

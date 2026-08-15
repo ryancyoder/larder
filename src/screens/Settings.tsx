@@ -4,6 +4,7 @@ import { runSeed } from '../db/seed'
 import { Field, Seg, Sheet } from '../components/ui'
 import { useToast } from '../app/toast'
 import { formatBytes, photoStorageBytes } from '../lib/photos'
+import { useLayout, type LayoutMode } from '../app/layout'
 
 type Theme = 'dark' | 'light'
 
@@ -15,6 +16,7 @@ export default function Settings({ onClose }: { onClose: () => void }) {
   const [key, setKey] = useState('')
   const [hasKey, setHasKey] = useState(false)
   const [photoBytes, setPhotoBytes] = useState<number | null>(null)
+  const { mode, setMode, viewportSuggests } = useLayout()
 
   useEffect(() => {
     getSetting('anthropicKey').then((k) => setHasKey(Boolean(k)))
@@ -63,6 +65,34 @@ export default function Settings({ onClose }: { onClose: () => void }) {
           options={[{ value: 'dark' as Theme, label: '🌙 Dark' }, { value: 'light' as Theme, label: '☀️ Light' }]}
         />
       </Field>
+
+      <Field label="Layout">
+        <Seg
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: 'auto' as LayoutMode, label: 'Auto' },
+            { value: 'compact' as LayoutMode, label: '📱 iPhone' },
+            { value: 'wide' as LayoutMode, label: '💻 iPad' },
+          ]}
+        />
+      </Field>
+      <p style={{ fontSize: 12.5, color: 'var(--text-mute)', marginTop: -4 }}>
+        {mode === 'auto' && (
+          <>
+            Following the screen — currently showing the{' '}
+            <strong style={{ color: 'var(--text-dim)' }}>{viewportSuggests === 'wide' ? 'iPad' : 'iPhone'}</strong>{' '}
+            layout, and it'll swap automatically when you rotate.
+          </>
+        )}
+        {mode === 'compact' && 'Pinned to the phone layout: one column, tab bar along the bottom.'}
+        {mode === 'wide' && (
+          <>
+            Pinned to the tablet layout: side rail, two-up lists, and the meal plan as a full
+            seven-day week. Best in landscape — in portrait it will feel tight.
+          </>
+        )}
+      </p>
 
       <div className="card card-pad stack">
         <div>

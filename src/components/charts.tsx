@@ -103,7 +103,7 @@ export function GroupedBars({
   return (
     <div>
       <Legend items={[{ label: seriesA, color: 'var(--viz-1)' }, { label: seriesB, color: 'var(--viz-2)' }]} />
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }} role="img" aria-label={`${seriesA} and ${seriesB} by month`}>
+      <svg viewBox={`0 0 ${W} ${H}`} className="chart-svg" role="img" aria-label={`${seriesA} and ${seriesB} by month`}>
         {[0, 0.5, 1].map((t) => (
           <g key={t}>
             <line x1={padL} x2={W - padR} y1={padT + plotH * t} y2={padT + plotH * t} stroke="var(--viz-grid)" strokeWidth="1" />
@@ -209,7 +209,7 @@ export function IntervalLine({ points, average }: { points: Array<{ date: string
 
   return (
     <div>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }} role="img" aria-label="Days between shopping trips">
+      <svg viewBox={`0 0 ${W} ${H}`} className="chart-svg" role="img" aria-label="Days between shopping trips">
         <defs>
           <linearGradient id="intervalFill" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--viz-1)" stopOpacity="0.28" />

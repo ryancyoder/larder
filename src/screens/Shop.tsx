@@ -112,7 +112,7 @@ export default function Shop() {
             </button>
           }
         >
-          <div className="stack" style={{ gap: 7 }}>
+          <div className="stack auto-cols" style={{ gap: 7 }}>
             {suggestions.map((s, i) => <SuggestionLine key={`${s.name}-${i}`} line={s} index={i} />)}
           </div>
         </Section>
@@ -127,7 +127,7 @@ export default function Shop() {
       ) : (
         grouped.map((g) => (
           <Section key={g.meta.key} title={`${g.meta.emoji} ${g.meta.label}`}>
-            <div className="stack" style={{ gap: 6 }}>
+            <div className="stack auto-cols" style={{ gap: 6 }}>
               {g.items.map((item, i) => (
                 <div
                   key={item.id}

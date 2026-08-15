@@ -76,7 +76,7 @@ export default function Recipes({ onOpenSettings }: { onOpenSettings: () => void
           (['ready', 'close', 'shop'] as const).map((band) =>
             bands[band].length === 0 ? null : (
               <Section key={band} title={BAND_META[band].label} hint={BAND_META[band].blurb}>
-                <div className="stack">
+                <div className="stack auto-cols">
                   {bands[band].slice(0, band === 'shop' ? 4 : 12).map((s, i) => (
                     <SuggestionRow key={s.recipe.id} s={s} index={i} onClick={() => setOpen(s.recipe)} />
                   ))}
@@ -97,7 +97,7 @@ export default function Recipes({ onOpenSettings }: { onOpenSettings: () => void
             {library.length === 0 ? (
               <Empty emoji="📖" title="Nothing here yet">Tap + to write your first recipe.</Empty>
             ) : (
-              <div className="stack">
+              <div className="stack auto-cols">
                 {library.map((r, i) => (
                   <button key={r.id} className="item" style={{ animationDelay: `${Math.min(i, 10) * 22}ms` }} onClick={() => setOpen(r)}>
                     <span style={{ fontSize: 25, flex: 'none', width: 40, textAlign: 'center' }}>{r.emoji}</span>

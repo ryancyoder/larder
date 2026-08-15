@@ -172,6 +172,15 @@ a { color: var(--accent); }
 
 .tabular { font-variant-numeric: tabular-nums; }
 
+/* Charts scale with their container but stop before the fixed viewBox ratio
+   makes them absurdly tall on a wide screen. */
+.chart-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 620px;
+}
+
 /* ==========================================================================
    App shell
    ========================================================================== */
@@ -264,51 +273,92 @@ a { color: var(--accent); }
 }
 .nav .slot { position: relative; }
 
-@media (min-width: 940px) {
-  .app { grid-template-columns: 216px minmax(0, 1fr); }
-  .main { max-width: 860px; margin: 0; padding-bottom: 60px; }
-  .nav {
-    position: sticky;
-    top: 0;
-    left: auto;
-    transform: none;
-    bottom: auto;
-    height: 100vh;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 3px;
-    padding: 24px 14px;
-    border-radius: 0;
-    border: none;
-    border-right: 1px solid var(--line);
-    background: transparent;
-    backdrop-filter: none;
-    box-shadow: none;
-  }
-  .nav button {
-    flex-direction: row;
-    align-items: center;
-    gap: 11px;
-    min-width: 0;
-    padding: 10px 14px;
-    border-radius: var(--r-md);
-    font-size: 14px;
-  }
-  .nav button .glyph { font-size: 17px; }
-  .nav .badge { position: static; margin-left: auto; }
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    padding: 0 14px 22px;
-    font-size: 17px;
-    font-weight: 700;
-    letter-spacing: -0.03em;
-  }
+/* --------------------------------------------------------------------------
+   Wide layout (tablet landscape / desktop).
+   Driven by [data-layout] rather than a media query, so the Settings toggle can
+   pin a layout that the viewport width alone wouldn't choose.
+   -------------------------------------------------------------------------- */
+
+:root[data-layout='wide'] .app { grid-template-columns: 216px minmax(0, 1fr); }
+
+:root[data-layout='wide'] .main {
+  /* Wider than the desktop reading column: on an iPad in landscape the point
+     is to use the horizontal space, not to leave a third of it empty. */
+  max-width: 1180px;
+  margin: 0;
+  padding: 0 26px 60px;
 }
 
+:root[data-layout='wide'] .nav {
+  position: sticky;
+  top: 0;
+  left: auto;
+  transform: none;
+  bottom: auto;
+  height: 100vh;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  padding: 24px 14px;
+  border-radius: 0;
+  border: none;
+  border-right: 1px solid var(--line);
+  background: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+:root[data-layout='wide'] .nav button {
+  flex-direction: row;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  /* Roomier than a desktop rail — this is a touch target, not a cursor target. */
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  font-size: 14px;
+}
+:root[data-layout='wide'] .nav button .glyph { font-size: 17px; }
+:root[data-layout='wide'] .nav .badge { position: static; margin-left: auto; }
+
 .brand { display: none; }
-@media (min-width: 940px) { .brand { display: flex; } }
+:root[data-layout='wide'] .brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 14px 22px;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+/* Lists that earn a second column once there's room for one. */
+:root[data-layout='wide'] .auto-cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  align-content: start;
+}
+
+/* KPI tiles go four across instead of two. */
+:root[data-layout='wide'] .stat-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+/* Two charts side by side rather than stacked. */
+:root[data-layout='wide'] .chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+/* The week as an actual week: seven columns, Monday to Sunday. */
+:root[data-layout='wide'] .week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  align-items: stretch;
+}
 
 /* ==========================================================================
    Surfaces
@@ -403,7 +453,7 @@ a { color: var(--accent); }
   transition: transform 0.16s var(--ease);
 }
 .fab:active { transform: scale(0.92); }
-@media (min-width: 940px) { .fab { bottom: 26px; right: 26px; } }
+:root[data-layout='wide'] .fab { bottom: 26px; right: 26px; }
 
 .chip {
   display: inline-flex;
@@ -804,7 +854,7 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
   font-weight: 600;
   animation: slideUp 0.24s var(--ease) both;
 }
-@media (min-width: 940px) { .toast { bottom: 26px; } }
+:root[data-layout='wide'] .toast { bottom: 26px; }
 
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(9px); }

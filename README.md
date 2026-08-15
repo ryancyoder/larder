@@ -25,6 +25,25 @@ either.
 
 One-time setup on the repo: **Settings → Pages → Source → GitHub Actions.**
 
+## Layout modes
+
+**Settings → Layout** switches between three modes, remembered per device:
+
+| Mode | Behaviour |
+|---|---|
+| **Auto** (default) | Follows the viewport — tablet layout at ≥940px, phone layout below. An iPad swaps automatically when you rotate. |
+| **iPhone** | Pinned to the phone layout: single column, floating tab bar along the bottom. |
+| **iPad** | Pinned to the tablet layout regardless of width. |
+
+The tablet layout is built for **landscape**: a side rail instead of a bottom bar, two-up
+inventory / recipe / shopping lists, four-across KPI tiles, ranked charts paired side by side,
+and the meal plan as a real seven-column week rather than a vertical list of days.
+
+These are driven by a `data-layout` attribute on `<html>`, not by media queries alone — that's
+what lets the manual override actually beat the viewport. An inline script in
+[`index.html`](index.html) resolves layout *and* theme before first paint, so neither flashes
+on load.
+
 ## Installing on an iPhone or iPad
 
 Open the deployed URL in Safari, then **Share → Add to Home Screen**.
