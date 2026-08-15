@@ -1,6 +1,29 @@
 /** Core domain types. One file, so the shape of the app is readable in one screen. */
 
-export type StorageLocation = 'fridge' | 'freezer' | 'pantry' | 'counter' | 'spice'
+/**
+ * A location key. Free-form because locations are user-editable — the five
+ * defaults ship with the keys 'fridge', 'freezer', 'pantry', 'counter' and
+ * 'spice', but a kitchen can have a garage fridge or a chest freezer too.
+ */
+export type StorageLocation = string
+
+/**
+ * How a place keeps food. Shelf-life estimates hang off this rather than off a
+ * specific location, so a newly added "Garage fridge" inherits sensible dates
+ * without anyone having to re-enter a shelf-life table.
+ */
+export type StorageKind = 'chilled' | 'frozen' | 'pantry' | 'counter'
+
+export interface StoragePlace {
+  id?: number
+  /** Stable slug referenced by Item.location. Never changes once created. */
+  key: string
+  label: string
+  emoji: string
+  blurb: string
+  kind: StorageKind
+  order: number
+}
 
 export type Category =
   | 'produce'

@@ -1,4 +1,4 @@
-import type { Category, StorageLocation, Unit } from '../db/schema'
+import type { Category, StorageKind, Unit } from '../db/schema'
 
 export interface CategoryMeta {
   key: Category
@@ -6,51 +6,37 @@ export interface CategoryMeta {
   emoji: string
   /** CSS custom-property suffix — resolves to --cat-<key> in global.css. */
   hue: string
-  /** Rough shelf life in days, per location. Used to pre-fill the expiry date. */
-  shelfLife: Partial<Record<StorageLocation, number>>
+  /**
+   * Rough shelf life in days, by *kind* of storage rather than by a named
+   * location — so a user-added "Garage fridge" inherits the chilled figures.
+   */
+  shelfLife: Partial<Record<StorageKind, number>>
   defaultUnit: Unit
   /** Sort order on the shopping list — roughly a supermarket walk. */
   aisle: number
+  /** Where this category naturally goes, if such a place exists. */
+  homeKind: StorageKind
 }
 
 export const CATEGORIES: CategoryMeta[] = [
-  { key: 'produce',   label: 'Produce',    emoji: '🥬', hue: 'produce',   aisle: 1, defaultUnit: 'ea',  shelfLife: { fridge: 7, counter: 4, freezer: 240, pantry: 10 } },
-  { key: 'bakery',    label: 'Bakery',     emoji: '🥖', hue: 'bakery',    aisle: 2, defaultUnit: 'loaf', shelfLife: { counter: 4, pantry: 5, fridge: 10, freezer: 90 } },
-  { key: 'protein',   label: 'Meat & fish', emoji: '🥩', hue: 'protein',  aisle: 3, defaultUnit: 'lb',  shelfLife: { fridge: 3, freezer: 180, pantry: 730 } },
-  { key: 'dairy',     label: 'Dairy & eggs', emoji: '🥛', hue: 'dairy',   aisle: 4, defaultUnit: 'ea',  shelfLife: { fridge: 14, freezer: 90, counter: 2 } },
-  { key: 'frozen',    label: 'Frozen',     emoji: '🧊', hue: 'frozen',    aisle: 5, defaultUnit: 'pkg', shelfLife: { freezer: 180, fridge: 3 } },
-  { key: 'grain',     label: 'Grains & pasta', emoji: '🍚', hue: 'grain', aisle: 6, defaultUnit: 'lb',  shelfLife: { pantry: 540, fridge: 7, freezer: 365 } },
-  { key: 'canned',    label: 'Canned & jarred', emoji: '🥫', hue: 'canned', aisle: 7, defaultUnit: 'can', shelfLife: { pantry: 730, fridge: 5 } },
-  { key: 'condiment', label: 'Condiments', emoji: '🫙', hue: 'condiment', aisle: 8, defaultUnit: 'ea',  shelfLife: { fridge: 180, pantry: 365 } },
-  { key: 'spice',     label: 'Spices & oils', emoji: '🧂', hue: 'spice',  aisle: 9, defaultUnit: 'ea',  shelfLife: { spice: 730, pantry: 730 } },
-  { key: 'snack',     label: 'Snacks',     emoji: '🍿', hue: 'snack',     aisle: 10, defaultUnit: 'pkg', shelfLife: { pantry: 120, counter: 60 } },
-  { key: 'beverage',  label: 'Drinks',     emoji: '🧃', hue: 'beverage',  aisle: 11, defaultUnit: 'ea',  shelfLife: { fridge: 30, pantry: 365 } },
-  { key: 'other',     label: 'Other',      emoji: '📦', hue: 'other',     aisle: 12, defaultUnit: 'ea',  shelfLife: { pantry: 180, fridge: 14, freezer: 180 } },
+  { key: 'produce',   label: 'Produce',    emoji: '🥬', hue: 'produce',   aisle: 1, defaultUnit: 'ea',  homeKind: 'chilled', shelfLife: { chilled: 7, counter: 4, frozen: 240, pantry: 10 } },
+  { key: 'bakery',    label: 'Bakery',     emoji: '🥖', hue: 'bakery',    aisle: 2, defaultUnit: 'loaf', homeKind: 'counter', shelfLife: { counter: 4, pantry: 5, chilled: 10, frozen: 90 } },
+  { key: 'protein',   label: 'Meat & fish', emoji: '🥩', hue: 'protein',  aisle: 3, defaultUnit: 'lb',  homeKind: 'chilled', shelfLife: { chilled: 3, frozen: 180, pantry: 730 } },
+  { key: 'dairy',     label: 'Dairy & eggs', emoji: '🥛', hue: 'dairy',   aisle: 4, defaultUnit: 'ea',  homeKind: 'chilled', shelfLife: { chilled: 14, frozen: 90, counter: 2 } },
+  { key: 'frozen',    label: 'Frozen',     emoji: '🧊', hue: 'frozen',    aisle: 5, defaultUnit: 'pkg', homeKind: 'frozen',  shelfLife: { frozen: 180, chilled: 3 } },
+  { key: 'grain',     label: 'Grains & pasta', emoji: '🍚', hue: 'grain', aisle: 6, defaultUnit: 'lb',  homeKind: 'pantry',  shelfLife: { pantry: 540, chilled: 7, frozen: 365 } },
+  { key: 'canned',    label: 'Canned & jarred', emoji: '🥫', hue: 'canned', aisle: 7, defaultUnit: 'can', homeKind: 'pantry', shelfLife: { pantry: 730, chilled: 5 } },
+  { key: 'condiment', label: 'Condiments', emoji: '🫙', hue: 'condiment', aisle: 8, defaultUnit: 'ea',  homeKind: 'chilled', shelfLife: { chilled: 180, pantry: 365 } },
+  { key: 'spice',     label: 'Spices & oils', emoji: '🧂', hue: 'spice',  aisle: 9, defaultUnit: 'ea',  homeKind: 'pantry',  shelfLife: { pantry: 730, counter: 365 } },
+  { key: 'snack',     label: 'Snacks',     emoji: '🍿', hue: 'snack',     aisle: 10, defaultUnit: 'pkg', homeKind: 'pantry', shelfLife: { pantry: 120, counter: 60 } },
+  { key: 'beverage',  label: 'Drinks',     emoji: '🧃', hue: 'beverage',  aisle: 11, defaultUnit: 'ea',  homeKind: 'chilled', shelfLife: { chilled: 30, pantry: 365 } },
+  { key: 'other',     label: 'Other',      emoji: '📦', hue: 'other',     aisle: 12, defaultUnit: 'ea',  homeKind: 'pantry',  shelfLife: { pantry: 180, chilled: 14, frozen: 180 } },
 ]
 
 const BY_KEY = new Map(CATEGORIES.map((c) => [c.key, c]))
 
 export function categoryMeta(key: Category): CategoryMeta {
   return BY_KEY.get(key) ?? CATEGORIES[CATEGORIES.length - 1]
-}
-
-export interface LocationMeta {
-  key: StorageLocation
-  label: string
-  emoji: string
-  blurb: string
-}
-
-export const LOCATIONS: LocationMeta[] = [
-  { key: 'fridge',  label: 'Fridge',  emoji: '🧊', blurb: 'Eat me first' },
-  { key: 'freezer', label: 'Freezer', emoji: '❄️', blurb: 'The long game' },
-  { key: 'pantry',  label: 'Pantry',  emoji: '🗄️', blurb: 'Shelf-stable' },
-  { key: 'counter', label: 'Counter', emoji: '🧺', blurb: 'Out in the open' },
-  { key: 'spice',   label: 'Spices',  emoji: '🧂', blurb: 'Flavour rack' },
-]
-
-export function locationMeta(key: StorageLocation): LocationMeta {
-  return LOCATIONS.find((l) => l.key === key) ?? LOCATIONS[0]
 }
 
 /**
@@ -80,14 +66,4 @@ export function guessCategory(name: string): Category {
     }
   }
   return best?.cat ?? 'other'
-}
-
-export function guessLocation(category: Category): StorageLocation {
-  switch (category) {
-    case 'produce': case 'dairy': case 'protein': case 'condiment': return 'fridge'
-    case 'frozen': return 'freezer'
-    case 'spice': return 'spice'
-    case 'bakery': return 'counter'
-    default: return 'pantry'
-  }
 }

@@ -5,6 +5,10 @@ import { Field, Seg, Sheet } from '../components/ui'
 import { useToast } from '../app/toast'
 import { formatBytes, photoStorageBytes } from '../lib/photos'
 import { useLayout, type LayoutMode } from '../app/layout'
+import { kindLabel, movePlace } from '../lib/locations'
+import { usePlaces } from '../app/data'
+import PlaceEditor from '../components/PlaceEditor'
+import type { StoragePlace } from '../db/schema'
 
 type Theme = 'dark' | 'light'
 
@@ -17,6 +21,8 @@ export default function Settings({ onClose }: { onClose: () => void }) {
   const [hasKey, setHasKey] = useState(false)
   const [photoBytes, setPhotoBytes] = useState<number | null>(null)
   const { mode, setMode, viewportSuggests } = useLayout()
+  const places = usePlaces() ?? []
+  const [editingPlace, setEditingPlace] = useState<StoragePlace | 'new' | null>(null)
 
   useEffect(() => {
     getSetting('anthropicKey').then((k) => setHasKey(Boolean(k)))
@@ -96,6 +102,48 @@ export default function Settings({ onClose }: { onClose: () => void }) {
 
       <div className="card card-pad stack">
         <div>
+          <div style={{ fontWeight: 650 }}>Storage locations</div>
+          <p style={{ fontSize: 12.5, color: 'var(--text-mute)', marginTop: 4 }}>
+            Where things live in your kitchen. Rename them, reorder them, or add your own — a
+            garage fridge, a chest freezer, a spice drawer.
+          </p>
+        </div>
+
+        <div className="stack" style={{ gap: 6 }}>
+          {places.map((place, i) => (
+            <div className="item" key={place.id} style={{ padding: '8px 10px' }}>
+              <span style={{ fontSize: 19, flex: 'none', width: 26, textAlign: 'center' }}>{place.emoji}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="name" style={{ fontSize: 14 }}>{place.label}</div>
+                <div className="meta">
+                  <span>{kindLabel(place.kind)}</span>
+                  {place.blurb && <><span>·</span><span>{place.blurb}</span></>}
+                </div>
+              </div>
+              <button
+                className="btn ghost sm"
+                aria-label={`Move ${place.label} up`}
+                disabled={i === 0}
+                onClick={() => movePlace(place.id!, -1)}
+              >↑</button>
+              <button
+                className="btn ghost sm"
+                aria-label={`Move ${place.label} down`}
+                disabled={i === places.length - 1}
+                onClick={() => movePlace(place.id!, 1)}
+              >↓</button>
+              <button className="btn sm" onClick={() => setEditingPlace(place)}>Edit</button>
+            </div>
+          ))}
+        </div>
+
+        <button className="btn ghost sm" style={{ alignSelf: 'flex-start' }} onClick={() => setEditingPlace('new')}>
+          + Add a location
+        </button>
+      </div>
+
+      <div className="card card-pad stack">
+        <div>
           <div style={{ fontWeight: 650 }}>AI recipe suggestions</div>
           <p style={{ fontSize: 12.5, color: 'var(--text-mute)', marginTop: 4 }}>
             Optional. Everything else works without it — the ranking engine already sorts your own
@@ -164,6 +212,14 @@ export default function Settings({ onClose }: { onClose: () => void }) {
       <p style={{ fontSize: 11.5, color: 'var(--text-mute)', textAlign: 'center' }}>
         Larder · installable from your browser's share menu
       </p>
+
+      {editingPlace && (
+        <PlaceEditor
+          place={editingPlace === 'new' ? undefined : editingPlace}
+          allPlaces={places}
+          onClose={() => setEditingPlace(null)}
+        />
+      )}
     </Sheet>
   )
 }

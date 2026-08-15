@@ -1,6 +1,6 @@
 import Dexie, { type Table } from 'dexie'
 import type {
-  Item, Reservation, Recipe, PlanEntry, ShopItem, Trip, LedgerEvent, Setting, Photo,
+  Item, Reservation, Recipe, PlanEntry, ShopItem, Trip, LedgerEvent, Setting, Photo, StoragePlace,
 } from './schema'
 
 /**
@@ -18,6 +18,7 @@ class LarderDB extends Dexie {
   events!: Table<LedgerEvent, number>
   settings!: Table<Setting, string>
   photos!: Table<Photo, number>
+  places!: Table<StoragePlace, number>
 
   constructor() {
     super('larder')
@@ -35,6 +36,12 @@ class LarderDB extends Dexie {
     this.version(2).stores({
       items: '++id, name, category, location, expiresAt, isStaple, archived, tripId, barcode',
       photos: '++id, source',
+    })
+    // v3 makes storage locations editable. The table starts empty for existing
+    // installs and is filled by ensurePlaces() at boot, which is idempotent —
+    // safer than an upgrade hook that only runs on one specific version jump.
+    this.version(3).stores({
+      places: '++id, &key, order',
     })
   }
 }

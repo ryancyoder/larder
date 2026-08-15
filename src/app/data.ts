@@ -1,7 +1,8 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
 import { buildViews } from '../lib/inventory'
-import type { ItemView, LedgerEvent, PlanEntry, Recipe, ShopItem, Trip } from '../db/schema'
+import { sortPlaces } from '../lib/locations'
+import type { ItemView, LedgerEvent, PlanEntry, Recipe, ShopItem, StoragePlace, Trip } from '../db/schema'
 
 /** Live views over IndexedDB. Every screen reads through these, never the tables directly. */
 
@@ -41,6 +42,11 @@ export function useTrips(): Trip[] | undefined {
 
 export function useEvents(): LedgerEvent[] | undefined {
   return useLiveQuery(() => db.events.toArray(), [])
+}
+
+/** Always ordered — every screen renders locations in the user's chosen sequence. */
+export function usePlaces(): StoragePlace[] | undefined {
+  return useLiveQuery(async () => sortPlaces(await db.places.toArray()), [])
 }
 
 export function useSetting(key: string): string | undefined {

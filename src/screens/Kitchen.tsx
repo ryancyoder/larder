@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { ItemView, StorageLocation } from '../db/schema'
-import { useKitchen } from '../app/data'
-import { LOCATIONS, categoryMeta } from '../lib/categories'
+import { useKitchen, usePlaces } from '../app/data'
+import { categoryMeta } from '../lib/categories'
 import { expiringSoon, freshnessOf, sortByUrgency, unitPrice } from '../lib/inventory'
 import { formatAmount } from '../lib/units'
 import { similarity } from '../lib/match'
@@ -13,6 +13,7 @@ type Filter = 'all' | StorageLocation
 
 export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void }) {
   const items = useKitchen()
+  const places = usePlaces() ?? []
   const [filter, setFilter] = useState<Filter>('all')
   const [query, setQuery] = useState('')
   const [adding, setAdding] = useState(false)
@@ -37,11 +38,11 @@ export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void
 
   const grouped = useMemo(() => {
     if (filter !== 'all' || query.trim()) return null
-    return LOCATIONS.map((loc) => ({
+    return places.map((loc) => ({
       loc,
       items: visible.filter((i) => i.location === loc.key),
     })).filter((g) => g.items.length > 0)
-  }, [visible, filter, query])
+  }, [visible, filter, query, places])
 
   if (!items) return null
 
@@ -112,7 +113,7 @@ export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void
           onChange={setFilter}
           options={[
             { value: 'all' as Filter, label: 'Everything' },
-            ...LOCATIONS.map((l) => ({ value: l.key as Filter, label: `${l.emoji} ${l.label}` })),
+            ...places.map((l) => ({ value: l.key as Filter, label: `${l.emoji} ${l.label}` })),
           ]}
         />
       </section>

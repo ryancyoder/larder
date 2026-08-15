@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import type { ItemView, StorageLocation } from '../db/schema'
-import { LOCATIONS, categoryMeta, locationMeta } from '../lib/categories'
+import { categoryMeta } from '../lib/categories'
+import { placeEmoji, placeLabel } from '../lib/locations'
+import { usePlaces } from '../app/data'
 import { formatAmount } from '../lib/units'
 import { consume, deleteItem, freshnessOf, releaseHold, reserve, unitPrice, waste } from '../lib/inventory'
 import { db } from '../db/db'
@@ -25,6 +27,7 @@ export default function ItemSheet({ item, onClose }: { item: ItemView; onClose: 
   const meta = categoryMeta(item.category)
   const fresh = freshnessOf(item)
   const perUnit = unitPrice(item)
+  const places = usePlaces() ?? []
   const hero = usePhotoUrl(item.photoId, 'full')
   const credit = useLiveQuery(
     async () => (item.photoId == null ? undefined : (await database.photos.get(item.photoId))?.attribution),
@@ -54,7 +57,7 @@ export default function ItemSheet({ item, onClose }: { item: ItemView; onClose: 
   async function move(location: StorageLocation) {
     if (!item.id) return
     await db.items.update(item.id, { location })
-    toast(`Moved to the ${location}`)
+    toast(`Moved to the ${placeLabel(places, location)}`)
   }
 
   return (
@@ -74,7 +77,7 @@ export default function ItemSheet({ item, onClose }: { item: ItemView; onClose: 
           </div>
           <div className="row" style={{ gap: 6, flexWrap: 'wrap', marginTop: 5 }}>
             <span className="chip"><span className="dot" style={{ background: `var(--cat-${meta.hue})` }} />{meta.label}</span>
-            <span className="chip">{locationMeta(item.location).emoji} {locationMeta(item.location).label}</span>
+            <span className="chip">{placeEmoji(places, item.location)} {placeLabel(places, item.location)}</span>
             <ExpiryChip item={item} />
           </div>
         </div>
@@ -123,7 +126,7 @@ export default function ItemSheet({ item, onClose }: { item: ItemView; onClose: 
 
           <Field label="Move it somewhere else">
             <select value={item.location} onChange={(e) => move(e.target.value as StorageLocation)}>
-              {LOCATIONS.map((l) => <option key={l.key} value={l.key}>{l.emoji} {l.label}</option>)}
+              {places.map((l) => <option key={l.key} value={l.key}>{l.emoji} {l.label}</option>)}
             </select>
           </Field>
 

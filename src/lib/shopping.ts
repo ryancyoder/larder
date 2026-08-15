@@ -3,6 +3,7 @@ import type { ItemView, PlanEntry, Recipe, ShopItem, Unit, Category } from '../d
 import { bestMatch, isAssumedStaple, normalize, titleCase } from './match'
 import { convert } from './units'
 import { guessCategory } from './categories'
+import { suggestPlace } from './locations'
 import { todayISO } from './dates'
 import { restock, addItem } from './inventory'
 
@@ -142,6 +143,9 @@ export async function checkout(items: ShopItem[], input: CheckoutInput): Promise
   const bought = items.filter((i) => i.checked)
   if (!bought.length) return null
 
+  // Read the user's own locations so new stock lands somewhere that exists.
+  const places = await db.places.toArray()
+
   const total = bought.reduce((sum, i) => sum + (input.prices[i.id!] ?? i.estPrice ?? 0), 0)
   const tripId = await db.trips.add({
     date: todayISO(),
@@ -163,7 +167,7 @@ export async function checkout(items: ShopItem[], input: CheckoutInput): Promise
     await addItem({
       name: line.name,
       category: line.category,
-      location: defaultLocationFor(line.category),
+      location: suggestPlace(places, line.category),
       qty: line.qty,
       qtyInitial: line.qty,
       unit: line.unit,
@@ -179,12 +183,3 @@ export async function checkout(items: ShopItem[], input: CheckoutInput): Promise
   return tripId
 }
 
-function defaultLocationFor(category: Category) {
-  switch (category) {
-    case 'produce': case 'dairy': case 'protein': case 'condiment': return 'fridge' as const
-    case 'frozen': return 'freezer' as const
-    case 'spice': return 'spice' as const
-    case 'bakery': return 'counter' as const
-    default: return 'pantry' as const
-  }
-}

@@ -25,6 +25,24 @@ either.
 
 One-time setup on the repo: **Settings → Pages → Source → GitHub Actions.**
 
+## Storage locations
+
+**Settings → Storage locations** — the five defaults (Fridge, Freezer, Pantry, Counter, Spices)
+are just seed data. Rename them, change the icon, reorder them, add your own, or delete one.
+
+Each location declares **how it stores**: chilled, frozen, cupboard, or room temperature. That's
+what shelf-life estimates key off, not the location's name — so a newly added "Garage fridge"
+immediately suggests the same best-before dates as the main fridge, with no shelf-life table to
+fill in.
+
+Two safeguards worth knowing:
+
+- A location's internal key is fixed once created, because items reference it. Renaming
+  "Pantry" to "Larder" keeps everything pointing at the right place.
+- Deleting a location makes you choose where its contents go. Items pointing at a location that
+  no longer existed would silently disappear from the Kitchen, so that isn't allowed — and the
+  last remaining location can't be deleted at all.
+
 ## Layout modes
 
 **Settings → Layout** switches between three modes, remembered per device:

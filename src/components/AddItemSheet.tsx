@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
 import type { Category, StorageLocation, Unit } from '../db/schema'
-import { CATEGORIES, LOCATIONS, categoryMeta, guessCategory, guessLocation } from '../lib/categories'
+import { CATEGORIES, categoryMeta, guessCategory } from '../lib/categories'
+import { placeLabel, suggestExpiry, suggestPlace } from '../lib/locations'
+import { usePlaces } from '../app/data'
 import { ALL_UNITS } from '../lib/units'
-import { addDays, todayISO } from '../lib/dates'
+import { todayISO } from '../lib/dates'
 import { addItem } from '../lib/inventory'
 import { titleCase } from '../lib/match'
 import { deletePhoto } from '../lib/photos'
@@ -13,14 +15,9 @@ import PhotoCapture from './PhotoCapture'
 import BarcodeScanner from './BarcodeScanner'
 import { useToast } from '../app/toast'
 
-/** Suggests an expiry date from the category's typical shelf life in that spot. */
-function suggestExpiry(category: Category, location: StorageLocation): string {
-  const days = categoryMeta(category).shelfLife[location] ?? 14
-  return addDays(todayISO(), days)
-}
-
 export default function AddItemSheet({ onClose }: { onClose: () => void }) {
   const toast = useToast()
+  const places = usePlaces() ?? []
   const [name, setName] = useState('')
   const [touchedCategory, setTouchedCategory] = useState(false)
   const [touchedLocation, setTouchedLocation] = useState(false)
@@ -47,8 +44,8 @@ export default function AddItemSheet({ onClose }: { onClose: () => void }) {
 
   // Everything the user hasn't explicitly set follows from the name.
   const category = touchedCategory ? categoryOverride : guessCategory(name)
-  const location = touchedLocation ? locationOverride : guessLocation(category)
-  const expiresAt = touchedExpiry ? expiryOverride : suggestExpiry(category, location)
+  const location = touchedLocation ? locationOverride : suggestPlace(places, category)
+  const expiresAt = touchedExpiry ? expiryOverride : suggestExpiry(places, category, location)
   const meta = categoryMeta(category)
 
   const suggestedUnit = useMemo(() => meta.defaultUnit, [meta])
@@ -121,7 +118,7 @@ export default function AddItemSheet({ onClose }: { onClose: () => void }) {
       barcode,
       brand,
     })
-    toast(`${titleCase(name.trim())} added to the ${location}`)
+    toast(`${titleCase(name.trim())} added to the ${placeLabel(places, location)}`)
     onClose()
   }
 
@@ -180,7 +177,7 @@ export default function AddItemSheet({ onClose }: { onClose: () => void }) {
         {name.trim() && (
           <p style={{ fontSize: 12.5, color: 'var(--text-mute)' }}>
             Filed as <strong style={{ color: `var(--cat-${meta.hue})` }}>{meta.emoji} {meta.label}</strong> in the{' '}
-            <strong style={{ color: 'var(--text-dim)' }}>{location}</strong> — change either below if that's wrong.
+            <strong style={{ color: 'var(--text-dim)' }}>{placeLabel(places, location)}</strong> — change either below if that's wrong.
           </p>
         )}
 
@@ -209,7 +206,7 @@ export default function AddItemSheet({ onClose }: { onClose: () => void }) {
               value={location}
               onChange={(e) => { setTouchedLocation(true); setLocationOverride(e.target.value as StorageLocation) }}
             >
-              {LOCATIONS.map((l) => <option key={l.key} value={l.key}>{l.emoji} {l.label}</option>)}
+              {places.map((l) => <option key={l.key} value={l.key}>{l.emoji} {l.label}</option>)}
             </select>
           </Field>
         </div>
