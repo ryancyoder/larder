@@ -12,6 +12,40 @@ npm run dev      # http://localhost:5180
 npm run build    # typecheck + production bundle into dist/
 ```
 
+## Deploying
+
+Pushing to `main` builds and publishes to GitHub Pages via
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml). The build typechecks first, so a
+type error fails the deploy instead of shipping a broken bundle.
+
+Assets are emitted with **relative paths** (`base: './'`), so the same bundle serves correctly
+from a domain root *or* a repo subpath like `you.github.io/larder/` — no rebuild, no per-host
+config. Routing is hash-based (`#kitchen`, `#shop`), so there's no server rewrite to configure
+either.
+
+One-time setup on the repo: **Settings → Pages → Source → GitHub Actions.**
+
+## Installing on an iPhone or iPad
+
+Open the deployed URL in Safari, then **Share → Add to Home Screen**.
+
+Do use Add to Home Screen rather than just bookmarking it — two reasons:
+
+1. **iOS evicts IndexedDB after 7 days of not visiting a site in Safari.** Installed web apps
+   are exempt from that cap; a plain Safari tab is not. Your whole kitchen lives in IndexedDB.
+2. The camera, the standalone chrome-less window, and the app icon all behave properly.
+
+Even so, the data lives in exactly one browser on one device. There's no sync. Use
+**Settings → Export JSON** now and then if the history matters to you.
+
+**The camera needs HTTPS.** GitHub Pages serves HTTPS, so the deployed app is fine — but the
+`npm run dev` server on your laptop is `http://` on your LAN, and Safari will refuse camera
+access there. Test scanning against the deployed URL, not the dev server.
+
+**Barcode scanning is slower on iOS.** Safari has no native `BarcodeDetector`, so the first scan
+pulls in the ZXing decoder (a separate ~119 KB gzipped chunk, cached afterwards) and decodes in
+software. Give it a second or two, and use the manual entry box if the light is poor.
+
 First launch seeds a realistic demo kitchen — 39 items, 8 recipes, and three months of
 shopping history — so every screen has something to show. Settings → *Reset to demo data*
 replays it; wiping your browser data starts you empty.
