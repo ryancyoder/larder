@@ -1,4 +1,4 @@
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveQuery } from './live'
 import { db } from '../db/db'
 import { buildViews } from '../lib/inventory'
 import { sortPlaces } from '../lib/locations'

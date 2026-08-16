@@ -1,109 +1,118 @@
-import Dexie, { type Table } from 'dexie'
+import { supabase } from '../lib/supabase'
+import { Table, bump, getHouseholdId } from './remote'
 import type {
-  Item, Reservation, Recipe, PlanEntry, ShopItem, Trip, LedgerEvent, Setting, Photo, StoragePlace,
-  StorageCategory, MealSlot, MealDay, Combo, Person,
+  Item, Reservation, Recipe, PlanEntry, ShopItem, Trip, LedgerEvent, Photo, StoragePlace,
+  StorageCategory, MealDay, Combo, Person, Setting,
 } from './schema'
 
 /**
- * Everything lives in IndexedDB. The tables are deliberately shaped so a hosted
- * backend could take over later: each row is self-contained and referenced by id,
- * with no derived state persisted (availability, spend and waste are all computed).
+ * The database, now Postgres.
+ *
+ * Deliberately the same shape the app has always imported — `db.items.get(id)`,
+ * `db.events.add(...)` — so the swap from IndexedDB reached the storage layer
+ * and stopped there rather than rippling through every screen.
+ *
+ * The names on the left are the app's; the strings are the real tables. They
+ * differ where the old IndexedDB names were abbreviations that read badly in
+ * SQL: `cats` is not a word, and `plan` is a poor name for a table of entries.
  */
-class LarderDB extends Dexie {
-  items!: Table<Item, number>
-  reservations!: Table<Reservation, number>
-  recipes!: Table<Recipe, number>
-  plan!: Table<PlanEntry, number>
-  shop!: Table<ShopItem, number>
-  trips!: Table<Trip, number>
-  events!: Table<LedgerEvent, number>
-  settings!: Table<Setting, string>
-  photos!: Table<Photo, number>
-  places!: Table<StoragePlace, number>
-  days!: Table<MealDay, number>
-  cats!: Table<StorageCategory, number>
-  combos!: Table<Combo, number>
-  people!: Table<Person, number>
+class LarderDB {
+  items = new Table<Item>('items')
+  reservations = new Table<Reservation>('reservations')
+  recipes = new Table<Recipe>('recipes')
+  plan = new Table<PlanEntry>('plan_entries')
+  shop = new Table<ShopItem>('shop_items')
+  trips = new Table<Trip>('trips')
+  events = new Table<LedgerEvent>('ledger_events')
+  photos = new Table<Photo>('photos')
+  places = new Table<StoragePlace>('places')
+  cats = new Table<StorageCategory>('categories')
+  combos = new Table<Combo>('combos')
+  // A day has one dinner, so writing a second replaces the first.
+  days = new Table<MealDay>('meal_days', 'household_id,date,slot')
+  people = new Table<Person>('people')
+  settings = new SettingsTable()
 
-  constructor() {
-    super('larder')
-    this.version(1).stores({
-      items: '++id, name, category, location, expiresAt, isStaple, archived, tripId',
-      reservations: '++id, itemId, planId',
-      recipes: '++id, title, favorite, source',
-      plan: '++id, date, slot, recipeId, status',
-      shop: '++id, name, category, checked, source',
-      trips: '++id, date',
-      events: '++id, type, date, category, itemId',
-      settings: 'key',
-    })
-    // v2 adds photos. Existing rows migrate untouched — `photoId` is optional.
-    this.version(2).stores({
-      items: '++id, name, category, location, expiresAt, isStaple, archived, tripId, barcode',
-      photos: '++id, source',
-    })
-    // v3 makes storage locations editable. The table starts empty for existing
-    // installs and is filled by ensurePlaces() at boot, which is idempotent —
-    // safer than an upgrade hook that only runs on one specific version jump.
-    this.version(3).stores({
-      places: '++id, &key, order',
-    })
-    // v4 turns the meal tag from a multi-select array into a single category.
-    // No index changes, just data: keep the first tag anyone had already
-    // applied rather than silently dropping their work.
-    this.version(4).stores({}).upgrade(async (tx) => {
-      await tx.table('items').toCollection().modify((item: Item & { meals?: MealSlot[] }) => {
-        if (!item.meal && Array.isArray(item.meals) && item.meals.length) {
-          item.meal = item.meals[0]
-        }
-        delete item.meals
-        // A snack has no main dish, so the combination can't survive the move.
-        if (item.meal === 'snack') delete item.isMain
-      })
-    })
-    // v5 records the meals that actually happened, behind the calendar's solid
-    // days. `&[date+slot]` is unique on purpose: a day has one dinner, so
-    // logging a second one has to replace the first rather than stack.
-    this.version(5).stores({
-      days: '++id, &[date+slot], date, slot, itemId',
-    })
-    // v6 makes food categories editable, the same move locations made in v3.
-    // Starts empty and is filled by ensureCategories() at boot rather than by
-    // an upgrade hook, so an install that skipped a version still gets seeded.
-    this.version(6).stores({
-      cats: '++id, &key, aisle',
-    })
-    // v7 adds combinations — sets of things used together. Parts live inline on
-    // the row rather than in a join table: a combination is only ever read
-    // whole, and there's nothing to query a single part by.
-    this.version(7).stores({
-      combos: '++id, name, meal',
-    })
-    // v8 stops hiding things that ran out. Everything previously auto-archived
-    // is brought back, because the only way to get archived was to reach zero,
-    // and an empty shelf is information rather than a reason to forget the item.
-    this.version(8).stores({}).upgrade(async (tx) => {
-      await tx.table('items').toCollection().modify((item: Item) => {
-        if (item.archived) item.archived = false
-      })
-    })
-    // v9 lets a hold say who it's for. Seeded by ensurePeople() at boot for the
-    // same reason locations and categories are — an install that skipped a
-    // version still ends up with a household.
-    this.version(9).stores({
-      people: '++id, &key, order',
-      reservations: '++id, itemId, planId, personKey',
-    })
+  /**
+   * Runs the work. Notably **not** a transaction any more.
+   *
+   * PostgREST has no multi-statement transaction, so the calls inside can now
+   * fail independently — a consume could reduce a quantity and then fail to
+   * write its ledger event. Kept as a wrapper rather than deleted so the call
+   * sites still read as one operation, and so there is a single place to move
+   * to a Postgres function if a partial failure ever actually bites.
+   */
+  async transaction<T>(_mode: string, ...args: unknown[]): Promise<T> {
+    const work = args[args.length - 1] as () => Promise<T>
+    const result = await work()
+    bump()
+    return result
+  }
+}
+
+/**
+ * Settings are keyed by name rather than by id, so they get a small table of
+ * their own rather than being bent into the shape above.
+ */
+class SettingsTable {
+  async get(key: string): Promise<Setting | undefined> {
+    const household = getHouseholdId()
+    if (household == null) return undefined
+    const { data, error } = await supabase
+      .from('settings')
+      .select('key,value')
+      .eq('household_id', household)
+      .eq('key', key)
+      .maybeSingle()
+    if (error) throw error
+    return data ?? undefined
+  }
+
+  async put(row: Setting): Promise<void> {
+    const household = getHouseholdId()
+    if (household == null) return
+    const { error } = await supabase
+      .from('settings')
+      .upsert({ ...row, household_id: household }, { onConflict: 'household_id,key' })
+    if (error) throw error
+    bump()
+  }
+
+  async clear(): Promise<void> {
+    const household = getHouseholdId()
+    if (household == null) return
+    const { error } = await supabase.from('settings').delete().eq('household_id', household)
+    if (error) throw error
+    bump()
   }
 }
 
 export const db = new LarderDB()
 
+/**
+ * Settings are keyed by name rather than by id, so they don't fit the table
+ * shape above and get their own pair of functions — which is all the app ever
+ * used them through anyway.
+ */
 export async function getSetting(key: string, fallback = ''): Promise<string> {
-  const row = await db.settings.get(key)
-  return row?.value ?? fallback
+  const household = getHouseholdId()
+  if (household == null) return fallback
+  const { data, error } = await supabase
+    .from('settings')
+    .select('value')
+    .eq('household_id', household)
+    .eq('key', key)
+    .maybeSingle()
+  if (error) throw error
+  return data?.value ?? fallback
 }
 
 export async function setSetting(key: string, value: string): Promise<void> {
-  await db.settings.put({ key, value })
+  const household = getHouseholdId()
+  if (household == null) return
+  const { error } = await supabase
+    .from('settings')
+    .upsert({ household_id: household, key, value }, { onConflict: 'household_id,key' })
+  if (error) throw error
+  bump()
 }

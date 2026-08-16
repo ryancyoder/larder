@@ -287,13 +287,14 @@ export default function Settings({ onClose }: { onClose: () => void }) {
         <div>
           <div style={{ fontWeight: 650 }}>Your data</div>
           <p style={{ fontSize: 12.5, color: 'var(--text-mute)', marginTop: 4 }}>
-            Everything lives in IndexedDB on this device. Nothing is uploaded. Clearing your browser
-            data clears the app, so export if you care about the history.
+            Your kitchen lives in your own Supabase project, not on this device, so losing
+            or wiping a device no longer loses anything. Signing in on another device shows the
+            same kitchen, and changes appear on both.
             {photoBytes != null && photoBytes > 0 && (
-              <> Photos currently take up <strong style={{ color: 'var(--text-dim)' }}>{formatBytes(photoBytes)}</strong>.</>
+              <> Photos cached locally take up <strong style={{ color: 'var(--text-dim)' }}>{formatBytes(photoBytes)}</strong>.</>
             )}
-            {' '}The JSON export covers items, recipes, plans and history — photos are not included,
-            since they'd bloat the file.
+            {' '}The JSON export is still worth taking now and then — it is the only copy that
+            survives losing access to the account itself.
           </p>
         </div>
         {cutoutCached && (
@@ -316,13 +317,13 @@ export default function Settings({ onClose }: { onClose: () => void }) {
           <button
             className="btn ghost sm"
             onClick={async () => {
-              if (!confirm('Replace everything with the demo kitchen? Your current items, recipes and history will be deleted.')) return
+              if (!confirm('Restore the default locations, categories and household? Nothing in your kitchen is deleted.')) return
               await runSeed()
-              toast('Demo data restored')
+              toast('Defaults restored')
               onClose()
             }}
           >
-            Reset to demo data
+            Restore defaults
           </button>
         </div>
       </div>

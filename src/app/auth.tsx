@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase, supabaseConfigured } from '../lib/supabase'
+import { setHouseholdId, watchRemoteChanges } from '../db/remote'
 
 /**
  * Who is signed in, and which household they belong to.
@@ -34,7 +35,7 @@ export function useAuth() {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
-  const [householdId, setHouseholdId] = useState<number | null>(null)
+  const [householdId, setHousehold] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -67,6 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false
 
     if (!session) {
+      setHousehold(null)
       setHouseholdId(null)
       // Only stop waiting once the session check has actually resolved.
       if (supabaseConfigured) setLoading(false)
@@ -89,6 +91,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setError('This account has no household yet. Sign out and back in, or say so and it can be created.')
         } else {
           setError(null)
+          setHousehold(data.household_id)
+          // Every query filters on this, so it has to be set before the first
+          // one runs — hence here rather than inside the data hooks.
           setHouseholdId(data.household_id)
         }
         setLoading(false)
@@ -96,6 +101,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => { cancelled = true }
   }, [session])
+
+  // One realtime channel for the session, so a change on the iPad reaches the
+  // phone without either polling.
+  useEffect(() => {
+    if (householdId == null) return
+    return watchRemoteChanges()
+  }, [householdId])
 
   const value: AuthState = {
     session,
