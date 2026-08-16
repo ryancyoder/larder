@@ -1749,3 +1749,62 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
 }
 .pop-head { display: flex; align-items: center; gap: 10px; }
 .pop-head strong { flex: 1; min-width: 0; font-size: 15px; }
+
+/* ==========================================================================
+   Sign-in gate
+   The one screen shown before there is any kitchen to show.
+   ========================================================================== */
+
+.gate {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.gate-card {
+  width: min(380px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px 22px;
+  border-radius: var(--r-xl);
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-2);
+}
+.gate-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+}
+.gate-title { font-size: 22px; margin-top: 4px; }
+.gate-sub { font-size: 13px; color: var(--text-mute); margin-bottom: 4px; }
+.gate-error {
+  font-size: 12.5px;
+  color: var(--danger);
+  background: var(--danger-soft);
+  padding: 9px 11px;
+  border-radius: var(--r-md);
+}
+.gate-note {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  background: var(--accent-soft);
+  padding: 9px 11px;
+  border-radius: var(--r-md);
+}
+.gate-switch {
+  align-self: center;
+  font-size: 13px;
+  color: var(--accent);
+  font-weight: 600;
+  padding: 4px;
+}
+.gate-fine {
+  font-size: 11.5px;
+  color: var(--text-mute);
+  text-align: center;
+  line-height: 1.5;
+}

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { seedIfEmpty } from './db/seed'
 import { ToastProvider } from './app/toast'
 import { LayoutProvider } from './app/layout'
+import { AuthProvider, useAuth } from './app/auth'
+import SignIn from './screens/SignIn'
 import { useCategories, useKitchen, useShopList } from './app/data'
 import { expiringSoon } from './lib/inventory'
 import Kitchen from './screens/Kitchen'
@@ -29,6 +31,44 @@ function readTab(): Tab {
 }
 
 export default function App() {
+  return (
+    <AuthProvider>
+      <Gate />
+    </AuthProvider>
+  )
+}
+
+/**
+ * Nothing renders until we know who is signed in. Showing the kitchen first
+ * and the sign-in screen a moment later would flash an empty pantry at someone
+ * who is already signed in, which reads as data loss.
+ */
+function Gate() {
+  const { session, householdId, loading, error } = useAuth()
+
+  if (loading) {
+    return (
+      <div style={{ display: 'grid', placeItems: 'center', minHeight: '100dvh', color: 'var(--text-mute)' }}>
+        Opening the kitchen…
+      </div>
+    )
+  }
+  if (!session) return <SignIn />
+  if (error) {
+    return (
+      <div className="gate">
+        <div className="gate-card">
+          <div className="gate-brand"><span aria-hidden>🥬</span> Larder</div>
+          <p className="gate-error">{error}</p>
+        </div>
+      </div>
+    )
+  }
+  if (householdId == null) return <SignIn />
+  return <Shell />
+}
+
+function Shell() {
   const [tab, setTab] = useState<Tab>(readTab)
   const [ready, setReady] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
