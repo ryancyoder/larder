@@ -106,6 +106,20 @@ export async function setMain(id: number, isMain: boolean): Promise<boolean> {
   return true
 }
 
+/**
+ * Setting an item's meal from a tile. Tapping the meal it already has clears
+ * it, since one item has one meal and there's no other way to unset it here.
+ *
+ * Goes through the bulk path so the main-dish rule travels with it: moving
+ * something to a snack drops the main marker rather than leaving a state the
+ * editor forbids.
+ */
+export async function setMealSlot(id: number, slot: MealSlot): Promise<void> {
+  const item = await db.items.get(id)
+  if (!item) return
+  await applyBulk([id], { meal: item.meal === slot ? 'none' : slot })
+}
+
 /** Deletes each row through the single-item path so holds and photos go too. */
 export async function deleteMany(ids: number[]): Promise<number> {
   let removed = 0

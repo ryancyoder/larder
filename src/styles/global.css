@@ -25,6 +25,9 @@
   --danger: #f87171;
   --danger-soft: rgba(248, 113, 113, 0.14);
   --warn: #fbbf24;
+  /* Deliberately not --warn: a staple is a good thing, and sharing the warning
+     amber made the star read as a caution. */
+  --gold: #ffd23f;
 
   /* Freshness scale — green through to red as the clock runs down. */
   --fresh-fresh: #34d399;
@@ -89,6 +92,8 @@
   --danger: #dc2626;
   --danger-soft: rgba(220, 38, 38, 0.1);
   --warn: #b45309;
+  /* Darker on a light card, where bright gold has no contrast. */
+  --gold: #d99e00;
 
   --fresh-fresh: #059669;
   --fresh-soon: #ca8a04;
@@ -1182,7 +1187,12 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
   transition: transform 0.12s var(--ease), color 0.15s;
 }
 .pos-star:hover { color: var(--text-dim); }
-.pos-star.on { color: var(--warn); }
+/* A drop shadow in the same hue makes it read as gold rather than as a flat
+   yellow glyph over a dark tile. */
+.pos-star.on {
+  color: var(--gold);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--gold) 55%, transparent), 0 1px 2px rgba(0, 0, 0, 0.5);
+}
 .pos-star:active { transform: scale(0.82); }
 
 /* Keep the star clear of the two-line caption on a photo tile. */
@@ -1616,8 +1626,9 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
 .pos-main:active { transform: scale(0.82); }
 
 /* The flag shares the top edge with the main-dish button now. */
-.pos-flag.inset { left: 42px; }
-.pos-grid.large .pos-flag.inset { left: 46px; }
+/* Second row rather than alongside — B/L/D own the top centre now. */
+.pos-flag.inset { top: 42px; left: 6px; }
+.pos-grid.large .pos-flag.inset { top: 48px; left: 9px; }
 
 /* Reserved: an X across the whole tile, and the picture pulled back behind it.
    Held stock is stock you can see but must not spend, so it should read as
@@ -1647,3 +1658,39 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
 /* Under the X, so the mark stays the loudest thing on the tile. */
 .pos-tile.reserved .pos-fill,
 .pos-tile.reserved .pos-glyph { opacity: 0.4; }
+
+/* Meal markers: one letter each, centred between the two corner toggles.
+   Off is an outline so the row stays quiet on the many items that aren't
+   meal-specific; on is filled, and only ever one of the three. */
+.pos-meals {
+  position: absolute;
+  top: 7px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: flex;
+  gap: 3px;
+}
+.pos-meal {
+  width: 23px;
+  height: 23px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--text-mute) 55%, transparent);
+  background: color-mix(in srgb, var(--bg-0) 45%, transparent);
+  color: var(--text-mute);
+  font-size: 11.5px;
+  font-weight: 800;
+  line-height: 1;
+  transition: transform 0.12s var(--ease), background 0.15s, color 0.15s, border-color 0.15s;
+}
+.pos-meal:hover { color: var(--text-dim); border-color: var(--text-dim); }
+.pos-meal.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.pos-meal:active { transform: scale(0.86); }
+
+.pos-grid.large .pos-meal { width: 27px; height: 27px; font-size: 13px; }

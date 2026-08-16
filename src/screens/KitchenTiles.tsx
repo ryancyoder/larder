@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import type { ItemView } from '../db/schema'
+import type { ItemView, MealSlot } from '../db/schema'
 import { useKitchen } from '../app/data'
 import { usePhoto } from '../app/usePhoto'
 import { categoryMeta } from '../lib/categories'
 import { freshnessOf } from '../lib/inventory'
 import { formatAmount } from '../lib/units'
-import { setMain, setStaple } from '../lib/bulk'
+import { setMain, setMealSlot, setStaple } from '../lib/bulk'
 import TileBrowser, { isLow } from '../components/TileBrowser'
 import { Glyph } from '../components/ui'
 import ItemSheet from '../components/ItemSheet'
@@ -37,8 +37,15 @@ export default function KitchenTiles({ onClose }: { onClose: () => void }) {
         itemHint={(n) => `${n} items · tap to open`}
         closeLabel="Close the tile view"
         onClose={onClose}
-        renderItem={(item) => (
-          <KitchenTile key={item.id} item={item} onOpen={() => setSelected(item)} />
+        renderItem={(item, filter) => (
+          <KitchenTile
+            key={item.id}
+            item={item}
+            // A row of B/L/D under a Dinner filter would say what the filter
+            // already says, and the space is better spent on the tile.
+            showMeals={!MEAL_MARKS.some((m) => m.key === filter)}
+            onOpen={() => setSelected(item)}
+          />
         )}
         footer={({ place, placeKey, visible, all }) => (
           <>
@@ -70,7 +77,14 @@ export default function KitchenTiles({ onClose }: { onClose: () => void }) {
   )
 }
 
-function KitchenTile({ item, onOpen }: { item: ItemView; onOpen: () => void }) {
+/** Single letters, because a tile has room for a letter and not a word. */
+const MEAL_MARKS: Array<{ key: MealSlot; letter: string; label: string }> = [
+  { key: 'breakfast', letter: 'B', label: 'Breakfast' },
+  { key: 'lunch', letter: 'L', label: 'Lunch' },
+  { key: 'dinner', letter: 'D', label: 'Dinner' },
+]
+
+function KitchenTile({ item, showMeals, onOpen }: { item: ItemView; showMeals: boolean; onOpen: () => void }) {
   const toast = useToast()
   const { url: photo, cutout } = usePhoto(item.photoId, 'thumb')
   const meta = categoryMeta(item.category)
@@ -113,6 +127,26 @@ function KitchenTile({ item, onOpen }: { item: ItemView; onOpen: () => void }) {
       {/* Siblings rather than children: the tile is itself a button, and one
           button cannot legally nest inside another. Same trick the quick-add
           clear button uses. */}
+      {showMeals && (
+        <div className="pos-meals">
+          {MEAL_MARKS.map((m) => {
+            const on = item.meal === m.key
+            return (
+              <button
+                key={m.key}
+                className={`pos-meal${on ? ' on' : ''}`}
+                aria-pressed={on}
+                aria-label={on ? `${item.name} is ${m.label} — tap to clear` : `Mark ${item.name} as ${m.label}`}
+                title={on ? `${m.label} — tap to clear` : m.label}
+                onClick={() => setMealSlot(item.id!, m.key)}
+              >
+                {m.letter}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       <button
         className={`pos-main${item.isMain ? ' on' : ''}`}
         aria-pressed={Boolean(item.isMain)}

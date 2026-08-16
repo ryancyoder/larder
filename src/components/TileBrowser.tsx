@@ -84,7 +84,7 @@ export default function TileBrowser({
   itemHint: (count: number) => string
   closeLabel: string
   onClose: () => void
-  renderItem: (item: ItemView) => ReactNode
+  renderItem: (item: ItemView, filter: Filter) => ReactNode
   footer: (ctx: TileContext) => ReactNode
 }) {
   const items = useKitchen()
@@ -195,7 +195,7 @@ export default function TileBrowser({
             Nothing here matches. Try a different filter, or head back and pick another place.
           </p>
         ) : (
-          visible.map(renderItem)
+          visible.map((item) => renderItem(item, filter))
         )}
       </div>
 
