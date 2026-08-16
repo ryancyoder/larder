@@ -1370,9 +1370,15 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
 }
 
 /* The forecast is a guess, so it reads as one. */
-.cal-cell.cal-forecast .cal-fill { opacity: 0.45; border: 1px dashed var(--line-strong); }
+/* Only the picture fades on a forecast day. Dimming the whole tile took the
+   label down with it, which just made the text hard to read — the label is the
+   part you're scanning for. */
+.cal-cell.cal-forecast .cal-fill { border: 1px dashed var(--line-strong); }
+.cal-cell.cal-forecast .cal-fill img,
+.cal-cell.cal-forecast .cal-emoji { opacity: 0.4; }
 .cal-cell.cal-eaten { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
-.cal-cell.cal-eaten .cal-fill { opacity: 1; }
+.cal-cell.cal-eaten .cal-fill img,
+.cal-cell.cal-eaten .cal-emoji { opacity: 1; }
 .cal-cell.cal-eaten .cal-name { color: var(--text); font-weight: 600; }
 .cal-cell.cal-empty { background: transparent; border-style: dashed; }
 .cal-cell.past.cal-empty { opacity: 0.4; }
@@ -1385,7 +1391,9 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
   width: 12px; height: 12px; flex: none; padding: 0; border-radius: 3px; display: inline-block;
 }
 .cal-key .swatch.cal-eaten { background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); }
-.cal-key .swatch.cal-forecast { background: var(--accent-soft); opacity: 0.45; border: 1px dashed var(--line-strong); }
+/* Matches the cell: same tint, dashed edge. The faded picture is the other
+   half of the signal, and a 12px square has no room to show one. */
+.cal-key .swatch.cal-forecast { background: var(--accent-soft); border: 1px dashed var(--line-strong); }
 .cal-key .swatch.cal-empty { border: 1px dashed var(--line-strong); }
 
 /* Picking what actually filled a day. */
