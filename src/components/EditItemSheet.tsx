@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Category, ItemView, StorageLocation, Unit } from '../db/schema'
+import type { Category, ItemView, MealSlot, StorageLocation, Unit } from '../db/schema'
 import { CATEGORIES } from '../lib/categories'
 import { ALL_UNITS, MEASURE_UNITS, isCountUnit } from '../lib/units'
 import { adjustQuantity } from '../lib/inventory'
@@ -7,6 +7,7 @@ import { db } from '../db/db'
 import { usePlaces } from '../app/data'
 import { titleCase } from '../lib/match'
 import { Field, Sheet } from './ui'
+import MealTags from './MealTags'
 import { useToast } from '../app/toast'
 
 /**
@@ -32,6 +33,8 @@ export default function EditItemSheet({ item, onClose }: { item: ItemView; onClo
   const [isStaple, setIsStaple] = useState(item.isStaple)
   const [parQty, setParQty] = useState(String(item.parQty ?? 1))
   const [brand, setBrand] = useState(item.brand ?? '')
+  const [meals, setMeals] = useState<MealSlot[]>(item.meals ?? [])
+  const [isMain, setIsMain] = useState(Boolean(item.isMain))
 
   const sizeAllowed = isCountUnit(unit)
   const canSave = name.trim().length > 0 && Number(qty) >= 0
@@ -53,6 +56,8 @@ export default function EditItemSheet({ item, onClose }: { item: ItemView; onClo
       isStaple,
       parQty: isStaple ? Number(parQty) || 1 : undefined,
       brand: brand.trim() || undefined,
+      meals: meals.length ? meals : undefined,
+      isMain: isMain || undefined,
     })
 
     // Quantity goes through the ledger path so the correction is recorded.
@@ -141,6 +146,8 @@ export default function EditItemSheet({ item, onClose }: { item: ItemView; onClo
           <input type="number" min="0" step="0.01" placeholder="0.00" value={price} onChange={(e) => setPrice(e.target.value)} />
         </Field>
       </div>
+
+      <MealTags meals={meals} isMain={isMain} onChange={(n) => { setMeals(n.meals); setIsMain(n.isMain) }} />
 
       <Field label="Brand (optional)">
         <input type="text" value={brand} onChange={(e) => setBrand(e.target.value)} />

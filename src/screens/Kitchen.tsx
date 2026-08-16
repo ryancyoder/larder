@@ -1,21 +1,24 @@
 import { useMemo, useState } from 'react'
-import type { ItemView, StorageLocation } from '../db/schema'
+import type { ItemView, MealSlot, StorageLocation } from '../db/schema'
 import { useKitchen, usePlaces } from '../app/data'
 import { categoryMeta } from '../lib/categories'
 import { expiringSoon, freshnessOf, sortByUrgency, unitPrice } from '../lib/inventory'
 import { formatAmount } from '../lib/units'
 import { similarity } from '../lib/match'
+import { SLOTS } from '../lib/plan'
 import { CatDot, Empty, ExpiryChip, FreshnessRing, Section, Seg } from '../components/ui'
 import AddItemSheet from '../components/AddItemSheet'
 import ItemSheet from '../components/ItemSheet'
 
 type Filter = 'all' | StorageLocation
+type MealFilter = 'any' | MealSlot | 'main'
 
 export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void }) {
   const items = useKitchen()
   const places = usePlaces() ?? []
   const [filter, setFilter] = useState<Filter>('all')
   const [query, setQuery] = useState('')
+  const [mealFilter, setMealFilter] = useState<MealFilter>('any')
   const [adding, setAdding] = useState(false)
   const [selected, setSelected] = useState<ItemView | null>(null)
 
@@ -23,12 +26,14 @@ export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void
     if (!items) return []
     let list = items
     if (filter !== 'all') list = list.filter((i) => i.location === filter)
+    if (mealFilter === 'main') list = list.filter((i) => i.isMain)
+    else if (mealFilter !== 'any') list = list.filter((i) => i.meals?.includes(mealFilter))
     if (query.trim()) {
       const q = query.trim()
       list = list.filter((i) => i.name.toLowerCase().includes(q.toLowerCase()) || similarity(q, i.name) > 0.4)
     }
     return [...list].sort(sortByUrgency)
-  }, [items, filter, query])
+  }, [items, filter, query, mealFilter])
 
   // Keep the open sheet in sync after an edit rather than showing stale numbers.
   const live = selected && items ? items.find((i) => i.id === selected.id) ?? null : null
@@ -37,12 +42,12 @@ export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void
   const atRisk = urgent.reduce((sum, i) => sum + unitPrice(i) * i.available, 0)
 
   const grouped = useMemo(() => {
-    if (filter !== 'all' || query.trim()) return null
+    if (filter !== 'all' || query.trim() || mealFilter !== 'any') return null
     return places.map((loc) => ({
       loc,
       items: visible.filter((i) => i.location === loc.key),
     })).filter((g) => g.items.length > 0)
-  }, [visible, filter, query, places])
+  }, [visible, filter, query, mealFilter, places])
 
   if (!items) return null
 
@@ -116,6 +121,17 @@ export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void
             ...places.map((l) => ({ value: l.key as Filter, label: `${l.emoji} ${l.label}` })),
           ]}
         />
+        <div style={{ marginTop: 8 }}>
+          <Seg
+            value={mealFilter}
+            onChange={setMealFilter}
+            options={[
+              { value: 'any' as MealFilter, label: 'Any meal' },
+              ...SLOTS.map((sl) => ({ value: sl.key as MealFilter, label: `${sl.emoji} ${sl.label}` })),
+              { value: 'main' as MealFilter, label: '⭐ Mains' },
+            ]}
+          />
+        </div>
       </section>
 
       {visible.length === 0 ? (
@@ -166,6 +182,7 @@ function ItemRow({ item, index, onClick }: { item: ItemView; index: number; onCl
           {item.reserved > 0 && (
             <span className="chip tone-hold"><span className="dot" />{formatAmount(item.reserved, item.unit)} held</span>
           )}
+          {item.isMain && <span className="chip"><span className="dot" style={{ background: 'var(--warn)' }} />main</span>}
           {item.size && item.sizeUnit && (
             <span>· {formatAmount(item.size, item.sizeUnit)} each</span>
           )}

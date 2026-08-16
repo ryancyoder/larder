@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import type { ItemView, StorageLocation } from '../db/schema'
 import { categoryMeta } from '../lib/categories'
 import { placeEmoji, placeLabel } from '../lib/locations'
+import { SLOTS } from '../lib/plan'
 import { usePlaces } from '../app/data'
 import { formatAmount, formatPack, isCountUnit, packTotal } from '../lib/units'
 import { adjustQuantity, consume, deleteItem, freshnessOf, releaseHold, reserve, unitPrice, waste } from '../lib/inventory'
@@ -92,6 +93,13 @@ export default function ItemSheet({ item, onClose }: { item: ItemView; onClose: 
             <span className="chip"><span className="dot" style={{ background: `var(--cat-${meta.hue})` }} />{meta.label}</span>
             <span className="chip">{placeEmoji(places, item.location)} {placeLabel(places, item.location)}</span>
             <ExpiryChip item={item} />
+            {item.isMain && (
+              <span className="chip" style={{ color: 'var(--warn)' }}><span className="dot" />Main dish</span>
+            )}
+            {item.meals?.map((m) => {
+              const slot = SLOTS.find((s) => s.key === m)
+              return slot ? <span className="chip" key={m}>{slot.emoji} {slot.label}</span> : null
+            })}
           </div>
         </div>
       </div>

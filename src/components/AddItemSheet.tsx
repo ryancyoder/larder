@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Category, StorageLocation, Unit } from '../db/schema'
+import type { Category, MealSlot, StorageLocation, Unit } from '../db/schema'
 import { CATEGORIES, categoryMeta, guessCategory } from '../lib/categories'
 import { placeLabel, suggestExpiry, suggestPlace } from '../lib/locations'
 import { usePlaces } from '../app/data'
@@ -12,6 +12,7 @@ import { LookupError, importProductPhoto, lookupBarcode, type ProductLookup } fr
 import { scanningAvailable } from '../lib/barcode'
 import { Field, Sheet } from './ui'
 import PhotoCapture from './PhotoCapture'
+import MealTags from './MealTags'
 import BarcodeScanner from './BarcodeScanner'
 import { useToast } from '../app/toast'
 
@@ -33,6 +34,8 @@ export default function AddItemSheet({ onClose }: { onClose: () => void }) {
   const [size, setSize] = useState('')
   const [sizeUnit, setSizeUnit] = useState<Unit>('g')
   const [price, setPrice] = useState('')
+  const [meals, setMeals] = useState<MealSlot[]>([])
+  const [isMain, setIsMain] = useState(false)
   const [isStaple, setIsStaple] = useState(false)
   const [parQty, setParQty] = useState('1')
 
@@ -112,6 +115,8 @@ export default function AddItemSheet({ onClose }: { onClose: () => void }) {
       price: price ? Number(price) : undefined,
       purchasedAt: todayISO(),
       expiresAt: expiresAt || undefined,
+      meals: meals.length ? meals : undefined,
+      isMain: isMain || undefined,
       isStaple,
       parQty: isStaple ? Number(parQty) || 1 : undefined,
       archived: false,
@@ -244,6 +249,8 @@ export default function AddItemSheet({ onClose }: { onClose: () => void }) {
             <input type="number" min="0" step="0.01" placeholder="0.00" value={price} onChange={(e) => setPrice(e.target.value)} />
           </Field>
         </div>
+
+        <MealTags meals={meals} isMain={isMain} onChange={(n) => { setMeals(n.meals); setIsMain(n.isMain) }} />
 
         <label className="row" style={{ gap: 10, cursor: 'pointer' }}>
           <input type="checkbox" checked={isStaple} onChange={(e) => setIsStaple(e.target.checked)} />

@@ -100,6 +100,16 @@ export interface Item {
   purchasedAt: string // ISO date (yyyy-mm-dd)
   expiresAt?: string // ISO date
   openedAt?: string // ISO date — shortens effective shelf life
+  /**
+   * Which meals this is for. Uses the same slots as the meal planner, so
+   * "what have I got for breakfast?" and "plan a breakfast" agree.
+   */
+  meals?: MealSlot[]
+  /**
+   * The centrepiece of a meal rather than a component — chicken thighs yes,
+   * soy sauce no. Lets you check you have enough mains to cover the week.
+   */
+  isMain?: boolean
   /** Staples get auto-restocked on the shopping list when they drop below `parQty`. */
   isStaple: boolean
   parQty?: number

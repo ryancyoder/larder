@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import type { ItemView, StoragePlace } from '../db/schema'
+import type { ItemView, MealSlot, StoragePlace } from '../db/schema'
 import { useKitchen, usePlaces, useShopList } from '../app/data'
 import { usePhoto } from '../app/usePhoto'
 import { categoryMeta } from '../lib/categories'
@@ -9,6 +9,7 @@ import { formatAmount } from '../lib/units'
 import { similarity } from '../lib/match'
 import { bumpShopLine, clearShopLine, shopQtyFor } from '../lib/shopping'
 import { Seg } from '../components/ui'
+import { SLOTS } from '../lib/plan'
 
 /**
  * Walk-the-kitchen mode: a chrome-free grid of big targets, tapped once per
@@ -18,7 +19,7 @@ import { Seg } from '../components/ui'
  * through with one thumb, and leave.
  */
 
-type Filter = 'all' | 'low' | 'expiring' | 'staples'
+type Filter = 'all' | 'low' | 'expiring' | 'staples' | 'main' | MealSlot
 type Sort = 'name' | 'low' | 'expiring'
 type TileSize = 'regular' | 'large'
 
@@ -32,11 +33,14 @@ function readSize(): TileSize {
   }
 }
 
+// One scrollable control rather than a second row — chrome is at a premium here.
 const FILTERS: Array<{ value: Filter; label: string }> = [
   { value: 'all', label: 'All' },
   { value: 'low', label: 'Low' },
   { value: 'expiring', label: 'Expiring' },
   { value: 'staples', label: 'Staples' },
+  { value: 'main', label: '⭐ Mains' },
+  ...SLOTS.map((s) => ({ value: s.key as Filter, label: `${s.emoji} ${s.label}` })),
 ]
 
 const SORTS: Array<{ value: Sort; label: string }> = [
@@ -92,6 +96,8 @@ export default function QuickAdd({ onClose }: { onClose: () => void }) {
     if (filter === 'low') out = out.filter(isLow)
     if (filter === 'expiring') out = out.filter(isExpiring)
     if (filter === 'staples') out = out.filter((i) => i.isStaple)
+    if (filter === 'main') out = out.filter((i) => i.isMain)
+    if (SLOTS.some((s) => s.key === filter)) out = out.filter((i) => i.meals?.includes(filter as MealSlot))
 
     const q = query.trim()
     if (q) {

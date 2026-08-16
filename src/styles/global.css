@@ -475,6 +475,36 @@ a { color: var(--accent); }
 .chip.tone-fresh   { color: var(--fresh-fresh);   background: color-mix(in srgb, var(--fresh-fresh) 12%, transparent);   border-color: transparent; }
 .chip.tone-hold    { color: var(--accent-2);      background: color-mix(in srgb, var(--accent-2) 13%, transparent);      border-color: transparent; }
 
+/* Wrapping tag list. Not `.row`, whose centred single-line alignment makes a
+   chip that wraps onto its own line stretch to fill it. */
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  align-content: flex-start;
+  gap: 6px;
+}
+
+/* A chip that toggles. Bigger than a display chip because it's a tap target. */
+.chip.toggle {
+  flex: 0 0 auto;
+  padding: 7px 12px;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.chip.toggle:hover { border-color: var(--line-strong); }
+.chip.toggle.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.chip.toggle.is-main.on {
+  background: color-mix(in srgb, var(--warn) 16%, transparent);
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
 .seg {
   display: inline-flex;
   padding: 3px;
