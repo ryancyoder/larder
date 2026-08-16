@@ -1542,3 +1542,50 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
   border-color: color-mix(in srgb, var(--accent) 40%, transparent);
   background: var(--accent-soft);
 }
+
+/* ==========================================================================
+   Nutrition panel
+   Someone else's numbers about someone else's product, so it reads as a
+   quotation from a label rather than as the app's own data.
+   ========================================================================== */
+
+.nutri-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.nutri-table th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--text-dim);
+  padding: 5px 0;
+  border-bottom: 1px solid var(--line);
+}
+.nutri-table th.indent { padding-left: 14px; color: var(--text-mute); font-size: 12.5px; }
+.nutri-table td {
+  text-align: right;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--line);
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.nutri-table tr:last-child th,
+.nutri-table tr:last-child td { border-bottom: none; }
+
+/* Nutri-Score keeps its own published colours — it's a recognised mark, and
+   recolouring it to fit the theme would misrepresent it. */
+.nutri-score {
+  display: inline-grid;
+  place-items: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 7px;
+  border-radius: 7px;
+  font-size: 14px;
+  font-weight: 800;
+  color: #10221c;
+}
+.nutri-score.s-a { background: #038141; color: #fff; }
+.nutri-score.s-b { background: #85bb2f; }
+.nutri-score.s-c { background: #fecb02; }
+.nutri-score.s-d { background: #ee8100; color: #fff; }
+.nutri-score.s-e { background: #e63e11; color: #fff; }
+
+.nutri .seg { align-self: flex-start; }

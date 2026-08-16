@@ -1,6 +1,7 @@
-import type { Category, Unit } from '../db/schema'
+import type { Category, NutrientSet, Nutrition, Unit } from '../db/schema'
 import { guessCategory } from './categories'
 import { savePhoto, saveRemotePhoto } from './photos'
+import { todayISO } from './dates'
 
 /**
  * Open Food Facts lookup — a free, open product database. Barcodes are sent to
@@ -9,7 +10,16 @@ import { savePhoto, saveRemotePhoto } from './photos'
  */
 
 const ENDPOINT = 'https://world.openfoodfacts.org/api/v2/product'
-const FIELDS = 'product_name,product_name_en,generic_name,brands,quantity,categories_tags,image_front_url,image_url'
+/**
+ * Nutrition rides along on the same request — it's the same product document,
+ * so asking for it costs nothing beyond a slightly larger response.
+ */
+const FIELDS = [
+  'product_name', 'product_name_en', 'generic_name', 'brands', 'quantity',
+  'categories_tags', 'image_front_url', 'image_url',
+  'nutriments', 'nutriscore_grade', 'nova_group', 'serving_size',
+  'ingredients_text', 'ingredients_text_en', 'allergens_tags',
+].join(',')
 const TIMEOUT_MS = 8000
 
 export interface ProductLookup {
@@ -22,6 +32,8 @@ export interface ProductLookup {
   unit?: Unit
   category: Category
   imageUrl?: string
+  /** Absent whenever the product carries no label data worth keeping. */
+  nutrition?: Nutrition
   attribution: string
 }
 
@@ -81,6 +93,70 @@ export function parseQuantity(raw?: string): { qty?: number; unit?: Unit } {
   return {}
 }
 
+/** Open Food Facts stores everything as flat, suffixed keys on one object. */
+type Nutriments = Record<string, unknown>
+
+function num(raw: unknown): number | undefined {
+  const n = typeof raw === 'string' ? Number(raw) : raw
+  return typeof n === 'number' && Number.isFinite(n) && n >= 0 ? n : undefined
+}
+
+/**
+ * Reads one basis ('100g' or 'serving') out of the flat nutriments object.
+ *
+ * Energy is tried as kcal first and converted from kJ only as a fallback:
+ * European products often carry both, US ones frequently only kJ.
+ */
+function nutrientSet(n: Nutriments, basis: '100g' | 'serving'): NutrientSet | undefined {
+  const at = (key: string) => num(n[`${key}_${basis}`])
+  const kj = at('energy-kj') ?? at('energy')
+  const set: NutrientSet = {
+    kcal: at('energy-kcal') ?? (kj != null ? Math.round(kj / 4.184) : undefined),
+    fat: at('fat'),
+    satFat: at('saturated-fat'),
+    carbs: at('carbohydrates'),
+    sugars: at('sugars'),
+    fibre: at('fiber'),
+    protein: at('proteins'),
+    salt: at('salt'),
+    sodium: at('sodium'),
+  }
+  // All-empty means the product simply doesn't declare this basis.
+  return Object.values(set).some((v) => v != null) ? set : undefined
+}
+
+/** "en:milk" → "milk". The prefix is a locale tag, not part of the name. */
+function cleanTag(tag: string): string {
+  return tag.replace(/^[a-z]{2}:/, '').replace(/-/g, ' ')
+}
+
+function readNutrition(p: Record<string, unknown>): Nutrition | undefined {
+  const n = (p.nutriments ?? {}) as Nutriments
+  const per100 = nutrientSet(n, '100g')
+  const perServing = nutrientSet(n, 'serving')
+  const grade = typeof p.nutriscore_grade === 'string' ? p.nutriscore_grade.toLowerCase() : undefined
+  const nova = num(p.nova_group)
+  const ingredients = ((p.ingredients_text_en || p.ingredients_text) as string | undefined)?.trim()
+  const allergens = Array.isArray(p.allergens_tags)
+    ? (p.allergens_tags as string[]).map(cleanTag).filter(Boolean)
+    : undefined
+
+  // Nothing worth storing — the product is in the database but undocumented.
+  if (!per100 && !perServing && !grade && !nova && !ingredients && !allergens?.length) return undefined
+
+  return {
+    per100,
+    perServing,
+    servingSize: typeof p.serving_size === 'string' ? p.serving_size.trim() || undefined : undefined,
+    nutriScore: grade && /^[a-e]$/.test(grade) ? grade : undefined,
+    nova: nova && nova >= 1 && nova <= 4 ? nova : undefined,
+    ingredients: ingredients || undefined,
+    allergens: allergens?.length ? allergens : undefined,
+    source: 'openfoodfacts',
+    fetchedAt: todayISO(),
+  }
+}
+
 export async function lookupBarcode(barcode: string): Promise<ProductLookup | null> {
   const clean = barcode.replace(/\D/g, '')
   if (!clean) throw new LookupError('That barcode did not scan cleanly.')
@@ -117,6 +193,7 @@ export async function lookupBarcode(barcode: string): Promise<ProductLookup | nu
     ...parsed,
     category: categoryFromTags(p.categories_tags, name),
     imageUrl: p.image_front_url || p.image_url || undefined,
+    nutrition: readNutrition(p),
     attribution: 'Photo via Open Food Facts (CC BY-SA)',
   }
 }

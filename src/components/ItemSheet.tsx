@@ -14,6 +14,7 @@ import { useToast } from '../app/toast'
 import { usePhoto } from '../app/usePhoto'
 import { setItemPhoto } from '../lib/photos'
 import PhotoCapture from './PhotoCapture'
+import NutritionPanel from './NutritionPanel'
 import EditItemSheet from './EditItemSheet'
 import { db as database } from '../db/db'
 
@@ -25,6 +26,8 @@ export default function ItemSheet({ item, onClose }: { item: ItemView; onClose: 
   const [amount, setAmount] = useState(String(item.available || item.qty))
   const [reason, setReason] = useState('')
   const [label, setLabel] = useState('')
+  const [fetchingNutrition, setFetchingNutrition] = useState(false)
+  const [nutritionNote, setNutritionNote] = useState('')
 
   const meta = categoryMeta(item.category)
   const fresh = freshnessOf(item)
@@ -67,6 +70,31 @@ export default function ItemSheet({ item, onClose }: { item: ItemView; onClose: 
     if (!item.id) return
     await db.items.update(item.id, { location })
     toast(`Moved to the ${placeLabel(places, location)}`)
+  }
+
+  /** Re-asks Open Food Facts for the label figures on an item we already have. */
+  async function loadNutrition() {
+    if (!item.barcode || item.id == null) return
+    setFetchingNutrition(true)
+    setNutritionNote('')
+    try {
+      const { lookupBarcode } = await import('../lib/openfoodfacts')
+      const product = await lookupBarcode(item.barcode)
+      if (product?.nutrition) {
+        await database.items.update(item.id, { nutrition: product.nutrition })
+        toast('Nutrition added')
+      } else {
+        setNutritionNote(
+          product
+            ? 'Open Food Facts has this product but publishes no nutrition for it.'
+            : `Barcode ${item.barcode} isn't in Open Food Facts.`,
+        )
+      }
+    } catch (err) {
+      setNutritionNote(err instanceof Error ? err.message : 'The lookup failed.')
+    } finally {
+      setFetchingNutrition(false)
+    }
   }
 
   return (
@@ -188,6 +216,21 @@ export default function ItemSheet({ item, onClose }: { item: ItemView; onClose: 
             )}
           </dl>
         </>
+      )}
+
+      {mode === 'menu' && item.nutrition && <NutritionPanel nutrition={item.nutrition} />}
+
+      {/* Items scanned before nutrition existed, and ones whose product was
+          undocumented at the time, can go and ask again on demand. */}
+      {mode === 'menu' && !item.nutrition && item.barcode && (
+        <div className="card card-pad stack">
+          <button className="btn ghost block" disabled={fetchingNutrition} onClick={loadNutrition}>
+            {fetchingNutrition ? 'Looking it up…' : '🔎 Look up nutrition'}
+          </button>
+          {nutritionNote && (
+            <p style={{ fontSize: 12, color: 'var(--text-mute)' }}>{nutritionNote}</p>
+          )}
+        </div>
       )}
 
       {mode === 'edit' && (

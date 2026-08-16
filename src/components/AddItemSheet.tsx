@@ -12,6 +12,7 @@ import { LookupError, importProductPhoto, lookupBarcode, type ProductLookup } fr
 import { scanningAvailable } from '../lib/barcode'
 import { Field, Sheet } from './ui'
 import PhotoCapture from './PhotoCapture'
+import NutritionPanel from './NutritionPanel'
 import MealTags, { mainAllowedFor } from './MealTags'
 import BarcodeScanner from './BarcodeScanner'
 import { useToast } from '../app/toast'
@@ -162,6 +163,8 @@ export default function AddItemSheet({
       archived: false,
       photoId,
       barcode,
+      // Whatever the scan turned up. Undefined is the normal case.
+      nutrition: found?.nutrition,
       brand,
     })
     toast(`${titleCase(name.trim())} added to the ${placeLabel(places, location)}`)
@@ -203,6 +206,13 @@ export default function AddItemSheet({
               </div>
             </div>
           </div>
+        )}
+
+        {found?.nutrition && <NutritionPanel nutrition={found.nutrition} />}
+        {found && !found.nutrition && (
+          <p style={{ fontSize: 12, color: 'var(--text-mute)' }}>
+            Open Food Facts has this product but no nutrition for it — common on own-brand lines.
+          </p>
         )}
 
         {lookupNote && (

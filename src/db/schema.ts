@@ -89,6 +89,42 @@ export interface Photo {
   attribution?: string
 }
 
+/**
+ * Nutrients for a fixed amount. Every field is optional because Open Food Facts
+ * coverage is uneven — a product often declares energy and fat but nothing
+ * else, and a half-filled panel is more useful than none.
+ */
+export interface NutrientSet {
+  kcal?: number
+  fat?: number
+  satFat?: number
+  carbs?: number
+  sugars?: number
+  fibre?: number
+  protein?: number
+  salt?: number
+  sodium?: number
+}
+
+/** What a product's label says, as far as the database knows it. */
+export interface Nutrition {
+  /** Per 100 g or 100 ml — the basis Open Food Facts normalises everything to. */
+  per100?: NutrientSet
+  /** Per serving, only when the pack declares a serving. */
+  perServing?: NutrientSet
+  /** The declared serving, as printed: "30 g", "1 cup (240 ml)". */
+  servingSize?: string
+  /** Nutri-Score 'a'–'e', where products carry one. */
+  nutriScore?: string
+  /** NOVA processing group, 1 (unprocessed) to 4 (ultra-processed). */
+  nova?: number
+  ingredients?: string
+  allergens?: string[]
+  source: 'openfoodfacts'
+  /** So a figure that's years old can be identified and refreshed. */
+  fetchedAt: string
+}
+
 /** A physical thing in your kitchen. */
 export interface Item {
   id?: number
@@ -98,6 +134,11 @@ export interface Item {
   photoId?: number
   /** Product barcode, when the item was added by scanning one. */
   barcode?: string
+  /**
+   * Label figures from the barcode lookup. Absent is the normal case — plenty
+   * of products aren't in the database, and loose produce has no barcode at all.
+   */
+  nutrition?: Nutrition
   /** Quantity remaining right now (before reservations). */
   qty: number
   /** Quantity when it entered the kitchen — used for unit price + depletion %. */
