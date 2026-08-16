@@ -1,6 +1,6 @@
 import Dexie, { type Table } from 'dexie'
 import type {
-  Item, Reservation, Recipe, PlanEntry, ShopItem, Trip, LedgerEvent, Setting, Photo, StoragePlace,
+  Item, Reservation, Recipe, PlanEntry, ShopItem, Trip, LedgerEvent, Setting, Photo, StoragePlace, MealSlot,
 } from './schema'
 
 /**
@@ -42,6 +42,19 @@ class LarderDB extends Dexie {
     // safer than an upgrade hook that only runs on one specific version jump.
     this.version(3).stores({
       places: '++id, &key, order',
+    })
+    // v4 turns the meal tag from a multi-select array into a single category.
+    // No index changes, just data: keep the first tag anyone had already
+    // applied rather than silently dropping their work.
+    this.version(4).stores({}).upgrade(async (tx) => {
+      await tx.table('items').toCollection().modify((item: Item & { meals?: MealSlot[] }) => {
+        if (!item.meal && Array.isArray(item.meals) && item.meals.length) {
+          item.meal = item.meals[0]
+        }
+        delete item.meals
+        // A snack has no main dish, so the combination can't survive the move.
+        if (item.meal === 'snack') delete item.isMain
+      })
     })
   }
 }

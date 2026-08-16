@@ -27,7 +27,7 @@ export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void
     let list = items
     if (filter !== 'all') list = list.filter((i) => i.location === filter)
     if (mealFilter === 'main') list = list.filter((i) => i.isMain)
-    else if (mealFilter !== 'any') list = list.filter((i) => i.meals?.includes(mealFilter))
+    else if (mealFilter !== 'any') list = list.filter((i) => i.meal === mealFilter)
     if (query.trim()) {
       const q = query.trim()
       list = list.filter((i) => i.name.toLowerCase().includes(q.toLowerCase()) || similarity(q, i.name) > 0.4)

@@ -96,10 +96,10 @@ export default function ItemSheet({ item, onClose }: { item: ItemView; onClose: 
             {item.isMain && (
               <span className="chip" style={{ color: 'var(--warn)' }}><span className="dot" />Main dish</span>
             )}
-            {item.meals?.map((m) => {
-              const slot = SLOTS.find((s) => s.key === m)
-              return slot ? <span className="chip" key={m}>{slot.emoji} {slot.label}</span> : null
-            })}
+            {(() => {
+              const slot = SLOTS.find((s) => s.key === item.meal)
+              return slot ? <span className="chip">{slot.emoji} {slot.label}</span> : null
+            })()}
           </div>
         </div>
       </div>

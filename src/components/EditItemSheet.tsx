@@ -7,7 +7,7 @@ import { db } from '../db/db'
 import { usePlaces } from '../app/data'
 import { titleCase } from '../lib/match'
 import { Field, Sheet } from './ui'
-import MealTags from './MealTags'
+import MealTags, { mainAllowedFor } from './MealTags'
 import { useToast } from '../app/toast'
 
 /**
@@ -33,7 +33,7 @@ export default function EditItemSheet({ item, onClose }: { item: ItemView; onClo
   const [isStaple, setIsStaple] = useState(item.isStaple)
   const [parQty, setParQty] = useState(String(item.parQty ?? 1))
   const [brand, setBrand] = useState(item.brand ?? '')
-  const [meals, setMeals] = useState<MealSlot[]>(item.meals ?? [])
+  const [meal, setMeal] = useState<MealSlot | undefined>(item.meal)
   const [isMain, setIsMain] = useState(Boolean(item.isMain))
 
   const sizeAllowed = isCountUnit(unit)
@@ -56,8 +56,9 @@ export default function EditItemSheet({ item, onClose }: { item: ItemView; onClo
       isStaple,
       parQty: isStaple ? Number(parQty) || 1 : undefined,
       brand: brand.trim() || undefined,
-      meals: meals.length ? meals : undefined,
-      isMain: isMain || undefined,
+      meal,
+      // Belt and braces: the control prevents it, the write enforces it.
+      isMain: isMain && mainAllowedFor(meal) ? true : undefined,
     })
 
     // Quantity goes through the ledger path so the correction is recorded.
@@ -147,7 +148,7 @@ export default function EditItemSheet({ item, onClose }: { item: ItemView; onClo
         </Field>
       </div>
 
-      <MealTags meals={meals} isMain={isMain} onChange={(n) => { setMeals(n.meals); setIsMain(n.isMain) }} />
+      <MealTags meal={meal} isMain={isMain} onChange={(n) => { setMeal(n.meal); setIsMain(n.isMain) }} />
 
       <Field label="Brand (optional)">
         <input type="text" value={brand} onChange={(e) => setBrand(e.target.value)} />

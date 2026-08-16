@@ -97,7 +97,7 @@ export default function QuickAdd({ onClose }: { onClose: () => void }) {
     if (filter === 'expiring') out = out.filter(isExpiring)
     if (filter === 'staples') out = out.filter((i) => i.isStaple)
     if (filter === 'main') out = out.filter((i) => i.isMain)
-    if (SLOTS.some((s) => s.key === filter)) out = out.filter((i) => i.meals?.includes(filter as MealSlot))
+    if (SLOTS.some((s) => s.key === filter)) out = out.filter((i) => i.meal === filter)
 
     const q = query.trim()
     if (q) {

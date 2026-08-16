@@ -12,7 +12,7 @@ import { LookupError, importProductPhoto, lookupBarcode, type ProductLookup } fr
 import { scanningAvailable } from '../lib/barcode'
 import { Field, Sheet } from './ui'
 import PhotoCapture from './PhotoCapture'
-import MealTags from './MealTags'
+import MealTags, { mainAllowedFor } from './MealTags'
 import BarcodeScanner from './BarcodeScanner'
 import { useToast } from '../app/toast'
 
@@ -34,7 +34,7 @@ export default function AddItemSheet({ onClose }: { onClose: () => void }) {
   const [size, setSize] = useState('')
   const [sizeUnit, setSizeUnit] = useState<Unit>('g')
   const [price, setPrice] = useState('')
-  const [meals, setMeals] = useState<MealSlot[]>([])
+  const [meal, setMeal] = useState<MealSlot | undefined>()
   const [isMain, setIsMain] = useState(false)
   const [isStaple, setIsStaple] = useState(false)
   const [parQty, setParQty] = useState('1')
@@ -115,8 +115,8 @@ export default function AddItemSheet({ onClose }: { onClose: () => void }) {
       price: price ? Number(price) : undefined,
       purchasedAt: todayISO(),
       expiresAt: expiresAt || undefined,
-      meals: meals.length ? meals : undefined,
-      isMain: isMain || undefined,
+      meal,
+      isMain: isMain && mainAllowedFor(meal) ? true : undefined,
       isStaple,
       parQty: isStaple ? Number(parQty) || 1 : undefined,
       archived: false,
@@ -250,7 +250,7 @@ export default function AddItemSheet({ onClose }: { onClose: () => void }) {
           </Field>
         </div>
 
-        <MealTags meals={meals} isMain={isMain} onChange={(n) => { setMeals(n.meals); setIsMain(n.isMain) }} />
+        <MealTags meal={meal} isMain={isMain} onChange={(n) => { setMeal(n.meal); setIsMain(n.isMain) }} />
 
         <label className="row" style={{ gap: 10, cursor: 'pointer' }}>
           <input type="checkbox" checked={isStaple} onChange={(e) => setIsStaple(e.target.checked)} />
