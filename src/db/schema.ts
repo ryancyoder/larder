@@ -210,6 +210,45 @@ export interface MealDay {
   createdAt: string
 }
 
+/**
+ * One member of a combination.
+ *
+ * Carries both an id and a name on purpose. The id points at the row it was
+ * built from, which is exact while that row lives; the name is what survives
+ * the jar being finished and a new one bought weeks later. Resolution prefers
+ * the id and falls back to matching the name, so a combination outlives its
+ * ingredients.
+ */
+export interface ComboPart {
+  itemId?: number
+  name: string
+  /** Roughly how much gets used. Absent means "one of", which is usually right. */
+  qty?: number
+  /** Nice to have rather than required — doesn't count against completeness. */
+  optional?: boolean
+}
+
+/**
+ * Things that get used together: pasta and sauce, chips and salsa, rice and
+ * curry paste. Lighter than a recipe on purpose — no method, no servings, no
+ * timings — because the useful question is only ever "have I got the whole set,
+ * and what's missing?"
+ */
+export interface Combo {
+  id?: number
+  name: string
+  emoji: string
+  photoId?: number
+  parts: ComboPart[]
+  meal?: MealSlot
+  notes?: string
+  createdAt: string
+  timesUsed: number
+  lastUsedAt?: string
+  /** 'suggested' rows came from the app noticing a habit and being accepted. */
+  source: 'custom' | 'suggested'
+}
+
 export interface ShopItem {
   id?: number
   name: string

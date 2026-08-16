@@ -6,8 +6,9 @@ import { Empty, Section, Seg } from '../components/ui'
 import RecipeSheet from '../components/RecipeSheet'
 import RecipeEditor from '../components/RecipeEditor'
 import AISheet from '../components/AISheet'
+import Combos from './Combos'
 
-type View = 'suggest' | 'library'
+type View = 'suggest' | 'library' | 'combos'
 
 export default function Recipes({ onOpenSettings }: { onOpenSettings: () => void }) {
   const stock = useKitchen()
@@ -61,11 +62,14 @@ export default function Recipes({ onOpenSettings }: { onOpenSettings: () => void
           options={[
             { value: 'suggest' as View, label: 'What can I cook?' },
             { value: 'library' as View, label: 'My recipes' },
+            { value: 'combos' as View, label: 'Combos' },
           ]}
         />
       </div>
 
-      {view === 'suggest' ? (
+      {view === 'combos' ? (
+        <Combos stock={stock} />
+      ) : view === 'suggest' ? (
         recipes.length === 0 ? (
           <div className="section">
             <Empty emoji="🍳" title="No recipes yet">
@@ -119,7 +123,11 @@ export default function Recipes({ onOpenSettings }: { onOpenSettings: () => void
         </>
       )}
 
-      <button className="fab" onClick={() => setEditing('new')} aria-label="New recipe">+</button>
+      {/* Combinations have their own New button, and this one makes a recipe —
+          leaving it up would both overlap the list and do the wrong thing. */}
+      {view !== 'combos' && (
+        <button className="fab" onClick={() => setEditing('new')} aria-label="New recipe">+</button>
+      )}
 
       {open && (
         <RecipeSheet

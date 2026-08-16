@@ -1527,3 +1527,18 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
   border-radius: var(--r-md);
 }
 .pos-grid.large .pos-tile .pos-photo { width: 58%; }
+
+/* Combination part chips: a set you can read at a glance. Present parts sit
+   forward, missing ones recede — the shape of the gap is the information. */
+.chip.part {
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  color: var(--text-mute);
+  font-size: 12px;
+  font-weight: 600;
+}
+.chip.part.has {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  background: var(--accent-soft);
+}

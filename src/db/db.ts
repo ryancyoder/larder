@@ -1,7 +1,7 @@
 import Dexie, { type Table } from 'dexie'
 import type {
   Item, Reservation, Recipe, PlanEntry, ShopItem, Trip, LedgerEvent, Setting, Photo, StoragePlace,
-  StorageCategory, MealSlot, MealDay,
+  StorageCategory, MealSlot, MealDay, Combo,
 } from './schema'
 
 /**
@@ -22,6 +22,7 @@ class LarderDB extends Dexie {
   places!: Table<StoragePlace, number>
   days!: Table<MealDay, number>
   cats!: Table<StorageCategory, number>
+  combos!: Table<Combo, number>
 
   constructor() {
     super('larder')
@@ -70,6 +71,12 @@ class LarderDB extends Dexie {
     // an upgrade hook, so an install that skipped a version still gets seeded.
     this.version(6).stores({
       cats: '++id, &key, aisle',
+    })
+    // v7 adds combinations — sets of things used together. Parts live inline on
+    // the row rather than in a join table: a combination is only ever read
+    // whole, and there's nothing to query a single part by.
+    this.version(7).stores({
+      combos: '++id, name, meal',
     })
   }
 }

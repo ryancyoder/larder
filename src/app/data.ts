@@ -4,7 +4,7 @@ import { buildViews } from '../lib/inventory'
 import { sortPlaces } from '../lib/locations'
 import { setCategoryRegistry, sortCategories } from '../lib/categories'
 import type {
-  ItemView, LedgerEvent, MealDay, PlanEntry, Recipe, ShopItem, StorageCategory, StoragePlace, Trip,
+  Combo, ItemView, LedgerEvent, MealDay, PlanEntry, Recipe, ShopItem, StorageCategory, StoragePlace, Trip,
 } from '../db/schema'
 
 /** Live views over IndexedDB. Every screen reads through these, never the tables directly. */
@@ -38,6 +38,11 @@ export function usePlan(): PlanEntry[] | undefined {
 /** Meals that actually happened — the calendar's solid days. */
 export function useMealDays(): MealDay[] | undefined {
   return useLiveQuery(() => db.days.toArray(), [])
+}
+
+/** Combinations, newest habits first — resolution against stock happens in the view. */
+export function useCombos(): Combo[] | undefined {
+  return useLiveQuery(() => db.combos.toArray(), [])
 }
 
 export function useShopList(): ShopItem[] | undefined {
