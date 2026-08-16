@@ -15,6 +15,36 @@
     <link rel="apple-touch-icon" href="./icon-180.png" />
     <title>Larder</title>
     <script>
+      // Self-heal a stale index.html.
+      //
+      // Pages serves this file with a ten-minute cache but replaces the hashed
+      // bundles on every deploy, deleting the old ones. Deploy twice inside that
+      // window and a device can be left holding an index.html whose script now
+      // 404s — nothing boots, with no error the user can see or act on. Catch
+      // the failed load and re-fetch the page past the cache, once.
+      (function () {
+        var KEY = 'larder-recovering'
+        window.addEventListener(
+          'error',
+          function (e) {
+            var el = e.target
+            if (!el || (el.tagName !== 'SCRIPT' && el.tagName !== 'LINK')) return
+            try {
+              // Guard against a reload loop when the network is simply down.
+              if (sessionStorage.getItem(KEY)) return
+              sessionStorage.setItem(KEY, '1')
+            } catch (err) {
+              // Private mode has no sessionStorage; one attempt still beats none.
+            }
+            location.replace(location.pathname + '?rev=' + Date.now() + location.hash)
+          },
+          // Resource errors don't bubble, so this has to listen on capture.
+          true,
+        )
+      })()
+    </script>
+
+    <script>
       // Resolve theme and layout before first paint, so the app doesn't flash
       // the wrong one while React boots.
       (function () {
