@@ -1580,3 +1580,9 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
 .nutri-score.s-e { background: #e63e11; color: #fff; }
 
 .nutri .seg { align-self: flex-start; }
+
+/* Run out and you stay on the shelf, just faded. An empty jar is a reminder to
+   rebuy, which is worth more than a tidy list — but it shouldn't compete with
+   what you actually have. */
+.item.spent { opacity: 0.5; }
+.item.spent:hover { opacity: 0.75; }

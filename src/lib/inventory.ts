@@ -92,11 +92,11 @@ async function logAndApply(
       date: todayISO(),
       reason,
     })
-    await db.items.update(item.id!, {
-      qty: remaining,
-      // Staples stick around at zero so the shopping list knows to rebuy them.
-      archived: remaining <= 0 && !item.isStaple,
-    })
+    // Running out is not the same as no longer owning it. An empty jar stays
+    // in the kitchen, greyed out, because "I need to rebuy this" is exactly
+    // what an empty shelf is telling you — and because a thing that vanished
+    // when it hit zero looked like the app refusing to accept zero.
+    await db.items.update(item.id!, { qty: remaining })
     await trimHolds(item.id!, remaining)
   })
 }
@@ -194,7 +194,6 @@ export async function adjustQuantity(item: Item, newQty: number, reason?: string
       // Correcting upward past the original amount makes that the new baseline,
       // otherwise unit price and the depletion ring go wrong.
       qtyInitial: Math.max(item.qtyInitial, target),
-      archived: target <= 0 && !item.isStaple,
     })
     await trimHolds(item.id!, target)
   })

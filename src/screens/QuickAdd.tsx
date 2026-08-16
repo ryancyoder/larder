@@ -52,7 +52,7 @@ function ShopTile({ item, qty, list }: { item: ItemView; qty: number; list: Para
   return (
     <div className="pos-tile-wrap">
       <button
-        className={`pos-tile${qty > 0 ? ' on' : ''}${photo ? ' has-photo' : ''}${cutout ? ' has-cutout' : ''}`}
+        className={`pos-tile${qty > 0 ? ' on' : ''}${photo ? ' has-photo' : ''}${cutout ? ' has-cutout' : ''}${item.qty <= 0 ? ' spent' : ''}`}
         onClick={() => bumpShopLine(item, list)}
         aria-label={`Add ${item.name} to the shopping list`}
       >

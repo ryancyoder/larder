@@ -78,6 +78,14 @@ class LarderDB extends Dexie {
     this.version(7).stores({
       combos: '++id, name, meal',
     })
+    // v8 stops hiding things that ran out. Everything previously auto-archived
+    // is brought back, because the only way to get archived was to reach zero,
+    // and an empty shelf is information rather than a reason to forget the item.
+    this.version(8).stores({}).upgrade(async (tx) => {
+      await tx.table('items').toCollection().modify((item: Item) => {
+        if (item.archived) item.archived = false
+      })
+    })
   }
 }
 

@@ -260,7 +260,7 @@ function ItemRow({ item, index, onClick, selecting, picked }: {
   const meta = categoryMeta(item.category)
   return (
     <button
-      className={`item${item.reserved > 0 ? ' held' : ''}${picked ? ' picked' : ''}`}
+      className={`item${item.reserved > 0 ? ' held' : ''}${picked ? ' picked' : ''}${item.qty <= 0 ? ' spent' : ''}`}
       onClick={onClick}
       aria-pressed={selecting ? Boolean(picked) : undefined}
       style={{ animationDelay: `${Math.min(index, 10) * 22}ms` }}

@@ -62,7 +62,10 @@ function resolveLine(ing: Ingredient, stock: ItemView[]): MatchLine {
   // size: owning the ingredient at all is good enough to call it covered.
   const needed = neededInItemUnits(ing, item)
   if (needed == null) {
-    return { ingredient: ing, item, needed: null, status: item.available > 0 ? 'have' : 'reserved' }
+    if (item.available > 0) return { ingredient: ing, item, needed: null, status: 'have' }
+    // Empty is missing, not reserved — nothing is holding a jar that's gone.
+    // Matters more now that empties stay on the shelf instead of vanishing.
+    return { ingredient: ing, item, needed: null, status: item.qty > 0 ? 'reserved' : 'missing' }
   }
 
   if (item.available >= needed) return { ingredient: ing, item, needed, status: 'have' }

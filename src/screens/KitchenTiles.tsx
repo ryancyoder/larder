@@ -81,7 +81,7 @@ function KitchenTile({ item, onOpen }: { item: ItemView; onOpen: () => void }) {
     // scrollbar and back again, and the rows collapse to min-content.
     <div className="pos-tile-wrap">
     <button
-      className={`pos-tile${photo ? ' has-photo' : ''}${cutout ? ' has-cutout' : ''}${item.available <= 0 ? ' spent' : ''}`}
+      className={`pos-tile${photo ? ' has-photo' : ''}${cutout ? ' has-cutout' : ''}${item.qty <= 0 ? ' spent' : ''}`}
       onClick={onOpen}
       aria-label={`Open ${item.name}`}
     >

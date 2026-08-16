@@ -178,7 +178,11 @@ export interface Item {
   brand?: string
   notes?: string
   tripId?: number
-  /** Fully used/tossed and not a staple: hidden from the kitchen, kept for history. */
+  /**
+   * Hidden from the kitchen. Nothing sets this automatically any more — running
+   * out leaves an item on the shelf at zero. Kept on the model so older exports
+   * still import cleanly, and so an explicit "hide this" has somewhere to live.
+   */
   archived: boolean
 }
 
