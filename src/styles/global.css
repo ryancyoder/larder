@@ -1518,15 +1518,6 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
 }
 .hue-swatch:active { transform: scale(0.9); }
 
-/* A location or category picture filling its album tile, the same way an item
-   photo fills an item tile. */
-.pos-tile .pos-photo {
-  width: 62%;
-  max-height: 52%;
-  object-fit: cover;
-  border-radius: var(--r-md);
-}
-.pos-grid.large .pos-tile .pos-photo { width: 58%; }
 
 /* Combination part chips: a set you can read at a glance. Present parts sit
    forward, missing ones recede — the shape of the gap is the information. */

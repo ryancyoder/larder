@@ -211,10 +211,14 @@ function PlaceTile({ place, items, onOpen }: { place: StoragePlace; items: ItemV
 
   return (
     <div className="pos-tile-wrap">
-      <button className="pos-tile" onClick={onOpen}>
+      {/* Same treatment as an item tile: the picture is the button, and the
+          label sits on a scrim over it rather than beneath a thumbnail. */}
+      <button
+        className={`pos-tile${photo ? ' has-photo' : ''}${cutout ? ' has-cutout' : ''}`}
+        onClick={onOpen}
+      >
         {photo
-          ? <img className="pos-photo" src={photo} alt="" loading="lazy"
-                 style={cutout ? { objectFit: 'contain' } : undefined} />
+          ? <img className={`pos-fill${cutout ? ' is-cutout' : ''}`} src={photo} alt="" loading="lazy" />
           : <span className="pos-glyph">{place.emoji}</span>}
         <span className="pos-label">
           <span className="pos-name">{place.label}</span>
