@@ -5,6 +5,7 @@ import { categoryMeta } from '../lib/categories'
 import { freshnessOf } from '../lib/inventory'
 import { formatAmount } from '../lib/units'
 import { bumpShopLine, clearShopLine, shopQtyFor } from '../lib/shopping'
+import { Glyph } from '../components/ui'
 import TileBrowser, { isLow } from '../components/TileBrowser'
 
 /**
@@ -57,7 +58,7 @@ function ShopTile({ item, qty, list }: { item: ItemView; qty: number; list: Para
       >
         {photo
           ? <img className={`pos-fill${cutout ? ' is-cutout' : ''}`} src={photo} alt="" loading="lazy" />
-          : <span className="pos-glyph">{meta.emoji}</span>}
+          : <Glyph emoji={meta.emoji} photoId={meta.photoId} size={34} className="pos-glyph" />}
 
         {/* On a photo tile this becomes a scrimmed caption pinned to the bottom. */}
         <span className="pos-label">

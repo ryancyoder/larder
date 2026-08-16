@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { seedIfEmpty } from './db/seed'
 import { ToastProvider } from './app/toast'
 import { LayoutProvider } from './app/layout'
-import { useKitchen, useShopList } from './app/data'
+import { useCategories, useKitchen, useShopList } from './app/data'
 import { expiringSoon } from './lib/inventory'
 import Kitchen from './screens/Kitchen'
 import Calendar from './screens/Calendar'
@@ -35,6 +35,10 @@ export default function App() {
 
   const kitchen = useKitchen()
   const shop = useShopList()
+  // Mounted here for its side effect: this is what keeps the synchronous
+  // category registry in step with the table, including for the plain async
+  // libs that look categories up without being able to subscribe to anything.
+  useCategories()
 
   useEffect(() => {
     seedIfEmpty().finally(() => setReady(true))

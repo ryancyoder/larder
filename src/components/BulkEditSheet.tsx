@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { Category, MealSlot } from '../db/schema'
-import { CATEGORIES } from '../lib/categories'
-import { usePlaces } from '../app/data'
+
+import { useCategories, usePlaces } from '../app/data'
 import { SLOTS } from '../lib/plan'
 import { applyBulk, deleteMany, hasChanges, type BulkChanges } from '../lib/bulk'
 import { Field, Sheet } from './ui'
@@ -23,6 +23,7 @@ export default function BulkEditSheet({
 }) {
   const toast = useToast()
   const places = usePlaces() ?? []
+  const cats = useCategories() ?? []
   const [changes, setChanges] = useState<BulkChanges>({})
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
@@ -77,7 +78,7 @@ export default function BulkEditSheet({
           onChange={(e) => set('category', (e.target.value || undefined) as Category | undefined)}
         >
           <option value="">Leave unchanged</option>
-          {CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.emoji} {c.label}</option>)}
+          {cats.map((c) => <option key={c.key} value={c.key}>{c.emoji} {c.label}</option>)}
         </select>
       </Field>
 

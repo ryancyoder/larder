@@ -93,6 +93,48 @@ export function CatDot({ category }: { category: Category }) {
   return <span className="cat-dot" style={{ background: `var(--cat-${meta.hue})` }} aria-hidden />
 }
 
+/**
+ * The picture for a location or a category: a custom photo when one has been
+ * uploaded, and the emoji otherwise.
+ *
+ * Both models carry the same two fields, so one component serves both rather
+ * than each caller repeating the fallback and getting it subtly different.
+ */
+export function Glyph({
+  emoji, photoId, size = 34, className, rounded,
+}: {
+  emoji: string
+  photoId?: number
+  size?: number
+  className?: string
+  /** Circular rather than square — suits the small inline uses. */
+  rounded?: boolean
+}) {
+  const { url, cutout } = usePhoto(photoId, 'thumb')
+  if (!url) {
+    return (
+      <span className={className} style={{ fontSize: size, lineHeight: 1 }} aria-hidden>
+        {emoji}
+      </span>
+    )
+  }
+  return (
+    <img
+      className={className}
+      src={url}
+      alt=""
+      style={{
+        width: size,
+        height: size,
+        // A cutout has transparent edges; cropping one looks like a bug.
+        objectFit: cutout ? 'contain' : 'cover',
+        borderRadius: rounded ? '50%' : 8,
+        display: 'block',
+      }}
+    />
+  )
+}
+
 export function Stat({
   label, value, delta, tone,
 }: {

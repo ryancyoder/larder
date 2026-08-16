@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { StorageKind, StoragePlace } from '../db/schema'
 import { KINDS, addPlace, countItemsIn, deletePlace, updatePlace } from '../lib/locations'
 import { Field, Sheet } from './ui'
+import PhotoCapture from './PhotoCapture'
 import { useToast } from '../app/toast'
 
 /**
@@ -22,6 +23,7 @@ export default function PlaceEditor({
   const [emoji, setEmoji] = useState(place?.emoji ?? '📦')
   const [blurb, setBlurb] = useState(place?.blurb ?? '')
   const [kind, setKind] = useState<StorageKind>(place?.kind ?? 'pantry')
+  const [photoId, setPhotoId] = useState<number | undefined>(place?.photoId)
 
   const [itemCount, setItemCount] = useState<number | null>(null)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
@@ -42,10 +44,10 @@ export default function PlaceEditor({
 
   async function save() {
     if (place?.id) {
-      await updatePlace(place.id, { label: label.trim(), emoji: emoji.trim() || '📦', blurb: blurb.trim(), kind })
+      await updatePlace(place.id, { label: label.trim(), emoji: emoji.trim() || '📦', photoId, blurb: blurb.trim(), kind })
       toast(`${label.trim()} updated`)
     } else {
-      await addPlace({ label, emoji, blurb, kind })
+      await addPlace({ label, emoji, photoId, blurb, kind })
       toast(`${label.trim()} added`)
     }
     onClose()
@@ -97,6 +99,11 @@ export default function PlaceEditor({
           </Field>
         </div>
       </div>
+
+      <PhotoCapture photoId={photoId} onChange={setPhotoId} label="Picture (optional)" />
+      <p style={{ fontSize: 12, color: 'var(--text-mute)', marginTop: -4 }}>
+        A shot of the actual shelf, shown instead of the icon wherever this location appears.
+      </p>
 
       <Field label="Short note (optional)">
         <input

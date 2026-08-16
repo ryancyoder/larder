@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import type { Category, MealSlot, StorageLocation, Unit } from '../db/schema'
-import { CATEGORIES, categoryMeta, guessCategory } from '../lib/categories'
+import { categoryMeta, guessCategory } from '../lib/categories'
 import { placeLabel, suggestExpiry, suggestPlace } from '../lib/locations'
-import { usePlaces } from '../app/data'
+import { useCategories, usePlaces } from '../app/data'
 import { ALL_UNITS, MEASURE_UNITS, formatAmount, isCountUnit, toEachPack } from '../lib/units'
 import { todayISO } from '../lib/dates'
 import { addItem } from '../lib/inventory'
@@ -29,6 +29,7 @@ export default function AddItemSheet({
 }) {
   const toast = useToast()
   const places = usePlaces() ?? []
+  const cats = useCategories() ?? []
   const [name, setName] = useState('')
   const [touchedCategory, setTouchedCategory] = useState(false)
   // A filtered location counts as already chosen, so the name-based guess below
@@ -268,7 +269,7 @@ export default function AddItemSheet({
               value={category}
               onChange={(e) => { setTouchedCategory(true); setCategoryOverride(e.target.value as Category) }}
             >
-              {CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.emoji} {c.label}</option>)}
+              {cats.map((c) => <option key={c.key} value={c.key}>{c.emoji} {c.label}</option>)}
             </select>
           </Field>
           <Field label="Where">

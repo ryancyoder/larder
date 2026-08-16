@@ -2,7 +2,10 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
 import { buildViews } from '../lib/inventory'
 import { sortPlaces } from '../lib/locations'
-import type { ItemView, LedgerEvent, MealDay, PlanEntry, Recipe, ShopItem, StoragePlace, Trip } from '../db/schema'
+import { setCategoryRegistry, sortCategories } from '../lib/categories'
+import type {
+  ItemView, LedgerEvent, MealDay, PlanEntry, Recipe, ShopItem, StorageCategory, StoragePlace, Trip,
+} from '../db/schema'
 
 /** Live views over IndexedDB. Every screen reads through these, never the tables directly. */
 
@@ -52,6 +55,22 @@ export function useEvents(): LedgerEvent[] | undefined {
 /** Always ordered — every screen renders locations in the user's chosen sequence. */
 export function usePlaces(): StoragePlace[] | undefined {
   return useLiveQuery(async () => sortPlaces(await db.places.toArray()), [])
+}
+
+/**
+ * Categories in aisle order, and the only thing that keeps the synchronous
+ * registry behind `categoryMeta()` in step with the database.
+ *
+ * Mounted once at the app root so the registry is fresh for the plain async
+ * libs that can't subscribe to anything; components that display categories
+ * call it again to re-render when one is edited.
+ */
+export function useCategories(): StorageCategory[] | undefined {
+  return useLiveQuery(async () => {
+    const list = sortCategories(await db.cats.toArray())
+    setCategoryRegistry(list)
+    return list
+  }, [])
 }
 
 export function useSetting(key: string): string | undefined {

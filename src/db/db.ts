@@ -1,6 +1,7 @@
 import Dexie, { type Table } from 'dexie'
 import type {
-  Item, Reservation, Recipe, PlanEntry, ShopItem, Trip, LedgerEvent, Setting, Photo, StoragePlace, MealSlot, MealDay,
+  Item, Reservation, Recipe, PlanEntry, ShopItem, Trip, LedgerEvent, Setting, Photo, StoragePlace,
+  StorageCategory, MealSlot, MealDay,
 } from './schema'
 
 /**
@@ -20,6 +21,7 @@ class LarderDB extends Dexie {
   photos!: Table<Photo, number>
   places!: Table<StoragePlace, number>
   days!: Table<MealDay, number>
+  cats!: Table<StorageCategory, number>
 
   constructor() {
     super('larder')
@@ -62,6 +64,12 @@ class LarderDB extends Dexie {
     // logging a second one has to replace the first rather than stack.
     this.version(5).stores({
       days: '++id, &[date+slot], date, slot, itemId',
+    })
+    // v6 makes food categories editable, the same move locations made in v3.
+    // Starts empty and is filled by ensureCategories() at boot rather than by
+    // an upgrade hook, so an install that skipped a version still gets seeded.
+    this.version(6).stores({
+      cats: '++id, &key, aisle',
     })
   }
 }

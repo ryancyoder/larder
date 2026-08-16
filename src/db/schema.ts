@@ -20,24 +20,43 @@ export interface StoragePlace {
   key: string
   label: string
   emoji: string
+  /** A picture of the actual shelf, shown instead of the emoji when set. */
+  photoId?: number
   blurb: string
   kind: StorageKind
   order: number
 }
 
-export type Category =
-  | 'produce'
-  | 'protein'
-  | 'dairy'
-  | 'grain'
-  | 'frozen'
-  | 'canned'
-  | 'condiment'
-  | 'spice'
-  | 'bakery'
-  | 'snack'
-  | 'beverage'
-  | 'other'
+/**
+ * A category key. Free-form for the same reason locations are: a kitchen might
+ * want "Baby food" or "Dog", and the twelve defaults are only a starting point.
+ */
+export type Category = string
+
+/**
+ * An editable food category. Carries the things the app derives from a
+ * category — where it lives, how long it keeps, and where it falls on a walk
+ * round the shop — so a user-made category behaves like a built-in one.
+ */
+export interface StorageCategory {
+  id?: number
+  /** Stable slug referenced by items, shopping lines and the ledger. */
+  key: string
+  label: string
+  emoji: string
+  photoId?: number
+  /** Palette slot; resolves to --cat-<hue> in global.css. */
+  hue: string
+  /** Sort order on the shopping list — roughly a supermarket walk. */
+  aisle: number
+  /** Where this naturally goes, matched against a location's kind. */
+  homeKind: StorageKind
+  /**
+   * Rough shelf life in days, by *kind* of storage rather than by a named
+   * location — so a user-added "Garage fridge" inherits the chilled figures.
+   */
+  shelfLife: Partial<Record<StorageKind, number>>
+}
 
 export type Unit =
   // mass

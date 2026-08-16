@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { ItemView, MealSlot, StoragePlace } from '../db/schema'
 import { useKitchen, usePlaces } from '../app/data'
+import { usePhoto } from '../app/usePhoto'
 import { freshnessOf, sortByUrgency } from '../lib/inventory'
 import { similarity } from '../lib/match'
 import { SLOTS } from '../lib/plan'
@@ -206,11 +207,15 @@ export default function TileBrowser({
 function PlaceTile({ place, items, onOpen }: { place: StoragePlace; items: ItemView[]; onOpen: () => void }) {
   const mine = items.filter((i) => i.location === place.key)
   const low = mine.filter(isLow).length
+  const { url: photo, cutout } = usePhoto(place.photoId, 'thumb')
 
   return (
     <div className="pos-tile-wrap">
       <button className="pos-tile" onClick={onOpen}>
-        <span className="pos-glyph">{place.emoji}</span>
+        {photo
+          ? <img className="pos-photo" src={photo} alt="" loading="lazy"
+                 style={cutout ? { objectFit: 'contain' } : undefined} />
+          : <span className="pos-glyph">{place.emoji}</span>}
         <span className="pos-label">
           <span className="pos-name">{place.label}</span>
           <span className="pos-meta">{mine.length} items</span>

@@ -7,9 +7,12 @@ import { formatBytes, photoStorageBytes } from '../lib/photos'
 import { MODEL_DOWNLOAD_MB, clearModelCache, modelIsCached } from '../lib/cutout'
 import { useLayout, type LayoutMode } from '../app/layout'
 import { kindLabel, movePlace } from '../lib/locations'
-import { usePlaces } from '../app/data'
+import { moveCategory } from '../lib/categories'
+import { useCategories, usePlaces } from '../app/data'
 import PlaceEditor from '../components/PlaceEditor'
-import type { StoragePlace } from '../db/schema'
+import CategoryEditor from '../components/CategoryEditor'
+import { Glyph } from '../components/ui'
+import type { StorageCategory, StoragePlace } from '../db/schema'
 
 type Theme = 'dark' | 'light'
 
@@ -24,7 +27,9 @@ export default function Settings({ onClose }: { onClose: () => void }) {
   const [cutoutCached, setCutoutCached] = useState(false)
   const { mode, setMode, viewportSuggests } = useLayout()
   const places = usePlaces() ?? []
+  const cats = useCategories() ?? []
   const [editingPlace, setEditingPlace] = useState<StoragePlace | 'new' | null>(null)
+  const [editingCat, setEditingCat] = useState<StorageCategory | 'new' | null>(null)
 
   useEffect(() => {
     getSetting('anthropicKey').then((k) => setHasKey(Boolean(k)))
@@ -115,7 +120,9 @@ export default function Settings({ onClose }: { onClose: () => void }) {
         <div className="stack" style={{ gap: 6 }}>
           {places.map((place, i) => (
             <div className="item" key={place.id} style={{ padding: '8px 10px' }}>
-              <span style={{ fontSize: 19, flex: 'none', width: 26, textAlign: 'center' }}>{place.emoji}</span>
+              <span style={{ flex: 'none', width: 26, display: 'grid', placeItems: 'center' }}>
+                <Glyph emoji={place.emoji} photoId={place.photoId} size={22} rounded />
+              </span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="name" style={{ fontSize: 14 }}>{place.label}</div>
                 <div className="meta">
@@ -142,6 +149,56 @@ export default function Settings({ onClose }: { onClose: () => void }) {
 
         <button className="btn ghost sm" style={{ alignSelf: 'flex-start' }} onClick={() => setEditingPlace('new')}>
           + Add a location
+        </button>
+      </div>
+
+      <div className="card card-pad stack">
+        <div>
+          <div style={{ fontWeight: 650 }}>Categories</div>
+          <p style={{ fontSize: 12.5, color: 'var(--text-mute)', marginTop: 4 }}>
+            What kind of food a thing is. The order here is the order of your shopping list, so
+            arrange it to match your walk round the shop.
+          </p>
+        </div>
+
+        <div className="stack" style={{ gap: 6 }}>
+          {cats.map((cat, i) => (
+            <div className="item" key={cat.id} style={{ padding: '8px 10px' }}>
+              <span style={{ flex: 'none', width: 26, display: 'grid', placeItems: 'center' }}>
+                <Glyph emoji={cat.emoji} photoId={cat.photoId} size={22} rounded />
+              </span>
+              <span
+                className="cat-dot"
+                style={{ background: `var(--cat-${cat.hue})`, flex: 'none' }}
+                aria-hidden
+              />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="name" style={{ fontSize: 14 }}>{cat.label}</div>
+                <div className="meta">
+                  <span>Aisle {cat.aisle}</span>
+                  <span>·</span>
+                  <span>{kindLabel(cat.homeKind)}</span>
+                </div>
+              </div>
+              <button
+                className="btn ghost sm"
+                aria-label={`Move ${cat.label} earlier`}
+                disabled={i === 0}
+                onClick={() => moveCategory(cat.id!, -1)}
+              >↑</button>
+              <button
+                className="btn ghost sm"
+                aria-label={`Move ${cat.label} later`}
+                disabled={i === cats.length - 1}
+                onClick={() => moveCategory(cat.id!, 1)}
+              >↓</button>
+              <button className="btn sm" onClick={() => setEditingCat(cat)}>Edit</button>
+            </div>
+          ))}
+        </div>
+
+        <button className="btn ghost sm" style={{ alignSelf: 'flex-start' }} onClick={() => setEditingCat('new')}>
+          + Add a category
         </button>
       </div>
 
@@ -236,6 +293,13 @@ export default function Settings({ onClose }: { onClose: () => void }) {
           place={editingPlace === 'new' ? undefined : editingPlace}
           allPlaces={places}
           onClose={() => setEditingPlace(null)}
+        />
+      )}
+      {editingCat && (
+        <CategoryEditor
+          category={editingCat === 'new' ? undefined : editingCat}
+          allCategories={cats}
+          onClose={() => setEditingCat(null)}
         />
       )}
     </Sheet>

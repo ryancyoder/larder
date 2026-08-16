@@ -7,6 +7,7 @@ import { freshnessOf } from '../lib/inventory'
 import { formatAmount } from '../lib/units'
 import { setStaple } from '../lib/bulk'
 import TileBrowser, { isLow } from '../components/TileBrowser'
+import { Glyph } from '../components/ui'
 import ItemSheet from '../components/ItemSheet'
 import AddItemSheet from '../components/AddItemSheet'
 
@@ -86,7 +87,9 @@ function KitchenTile({ item, onOpen }: { item: ItemView; onOpen: () => void }) {
     >
       {photo
         ? <img className={`pos-fill${cutout ? ' is-cutout' : ''}`} src={photo} alt="" loading="lazy" />
-        : <span className="pos-glyph">{meta.emoji}</span>}
+        // No photo of its own, so it borrows its category's — a picture of the
+        // category beats a generic emoji when one has been uploaded.
+        : <Glyph emoji={meta.emoji} photoId={meta.photoId} size={34} className="pos-glyph" />}
 
       <span className="pos-label">
         <span className="pos-name">{item.name}</span>

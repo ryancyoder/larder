@@ -95,13 +95,14 @@ async function uniqueKey(label: string): Promise<string> {
   return `${base}-${Date.now()}`
 }
 
-export async function addPlace(input: { label: string; emoji: string; blurb: string; kind: StorageKind }) {
+export async function addPlace(input: { label: string; emoji: string; photoId?: number; blurb: string; kind: StorageKind }) {
   const places = await db.places.toArray()
   const maxOrder = places.reduce((max, p) => Math.max(max, p.order), -1)
   await db.places.add({
     key: await uniqueKey(input.label),
     label: input.label.trim(),
     emoji: input.emoji.trim() || '📦',
+    photoId: input.photoId,
     blurb: input.blurb.trim(),
     kind: input.kind,
     order: maxOrder + 1,

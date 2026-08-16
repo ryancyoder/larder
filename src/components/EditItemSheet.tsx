@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import type { Category, ItemView, MealSlot, StorageLocation, Unit } from '../db/schema'
-import { CATEGORIES } from '../lib/categories'
+
 import { ALL_UNITS, MEASURE_UNITS, formatAmount, isCountUnit, toEachPack } from '../lib/units'
 import { adjustQuantity } from '../lib/inventory'
 import { db } from '../db/db'
-import { usePlaces } from '../app/data'
+import { useCategories, usePlaces } from '../app/data'
 import { titleCase } from '../lib/match'
 import { Field, Sheet } from './ui'
 import MealTags, { mainAllowedFor } from './MealTags'
@@ -20,6 +20,7 @@ import { useToast } from '../app/toast'
 export default function EditItemSheet({ item, onClose }: { item: ItemView; onClose: () => void }) {
   const toast = useToast()
   const places = usePlaces() ?? []
+  const cats = useCategories() ?? []
 
   const [name, setName] = useState(item.name)
   const [qty, setQty] = useState(String(item.qty))
@@ -179,7 +180,7 @@ export default function EditItemSheet({ item, onClose }: { item: ItemView; onClo
       <div className="grid-2">
         <Field label="Category">
           <select value={category} onChange={(e) => setCategory(e.target.value as Category)}>
-            {CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.emoji} {c.label}</option>)}
+            {cats.map((c) => <option key={c.key} value={c.key}>{c.emoji} {c.label}</option>)}
           </select>
         </Field>
         <Field label="Where">

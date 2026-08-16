@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { ShopItem } from '../db/schema'
-import { useAllStock, usePlan, useRecipes, useShopList, useTrips } from '../app/data'
-import { CATEGORIES, categoryMeta, guessCategory } from '../lib/categories'
+import { useCategories, useAllStock, usePlan, useRecipes, useShopList, useTrips } from '../app/data'
+import { categoryMeta, guessCategory } from '../lib/categories'
 import { addGeneratedLines, checkout, generateList, type GeneratedLine } from '../lib/shopping'
 import { formatAmount } from '../lib/units'
 import { titleCase } from '../lib/match'
@@ -16,6 +16,7 @@ export default function Shop() {
   const plan = usePlan()
   const recipes = useRecipes()
   const list = useShopList()
+  const cats = useCategories()
   const trips = useTrips()
   const toast = useToast()
 
@@ -29,12 +30,14 @@ export default function Shop() {
     return generateList(stock, upcoming, recipes, list)
   }, [stock, plan, recipes, list])
 
+  // Aisle order is the user's own — reordering categories in Settings
+  // reorders the list, which is the point of being able to reorder them.
   const grouped = useMemo(() => {
-    if (!list) return []
-    return CATEGORIES
+    if (!list || !cats) return []
+    return cats
       .map((c) => ({ meta: c, items: list.filter((i) => i.category === c.key) }))
       .filter((g) => g.items.length > 0)
-  }, [list])
+  }, [list, cats])
 
   if (!list || !stock) return null
 

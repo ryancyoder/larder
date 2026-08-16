@@ -2,6 +2,7 @@ import { db, getSetting, setSetting } from './db'
 import type { Category, Item, LedgerEvent, Recipe, StorageLocation, Unit } from './schema'
 import { addDays, startOfWeek, todayISO } from '../lib/dates'
 import { DEFAULT_PLACES, ensurePlaces } from '../lib/locations'
+import { DEFAULT_CATEGORIES, ensureCategories } from '../lib/categories'
 
 /**
  * A believable kitchen so every screen has something to show on first run.
@@ -326,9 +327,10 @@ function buildHistory(): { trips: Array<{ date: string; store: string; total: nu
 let inFlight: Promise<void> | null = null
 
 export async function seedIfEmpty(): Promise<void> {
-  // Locations exist independently of the demo data: an upgrading install keeps
-  // all its items but starts with an empty places table.
+  // Locations and categories exist independently of the demo data: an upgrading
+  // install keeps all its items but starts with those tables empty.
   await ensurePlaces()
+  await ensureCategories()
   if (inFlight) return inFlight
   if ((await getSetting('seeded')) === '1') return
   inFlight = runSeed().finally(() => { inFlight = null })
@@ -338,14 +340,15 @@ export async function seedIfEmpty(): Promise<void> {
 export async function runSeed(): Promise<void> {
   const today = todayISO()
 
-  await db.transaction('rw', [db.items, db.recipes, db.plan, db.shop, db.trips, db.events, db.reservations, db.settings, db.photos, db.places], async () => {
+  await db.transaction('rw', [db.items, db.recipes, db.plan, db.shop, db.trips, db.events, db.reservations, db.settings, db.photos, db.places, db.cats], async () => {
     await Promise.all([
       db.items.clear(), db.recipes.clear(), db.plan.clear(), db.shop.clear(),
       db.trips.clear(), db.events.clear(), db.reservations.clear(), db.photos.clear(),
-      db.places.clear(),
+      db.places.clear(), db.cats.clear(),
     ])
-    // The demo kitchen assumes the five default locations exist.
+    // The demo kitchen assumes the default locations and categories exist.
     await db.places.bulkAdd(DEFAULT_PLACES as never[])
+    await db.cats.bulkAdd(DEFAULT_CATEGORIES as never[])
 
     const items: Item[] = PANTRY.map(([name, category, location, qty, unit, price, expires, par]) => ({
       name, category, location, qty, qtyInitial: qty, unit, price,
