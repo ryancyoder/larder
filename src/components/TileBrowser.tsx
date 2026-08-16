@@ -38,7 +38,7 @@ const FILTERS: Array<{ value: Filter; label: string }> = [
   { value: 'low', label: 'Low' },
   { value: 'expiring', label: 'Expiring' },
   { value: 'staples', label: 'Staples' },
-  { value: 'main', label: '⭐ Mains' },
+  { value: 'main', label: '🍽️ Mains' },
   ...SLOTS.map((s) => ({ value: s.key as Filter, label: `${s.emoji} ${s.label}` })),
 ]
 

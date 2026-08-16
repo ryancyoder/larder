@@ -91,6 +91,21 @@ export async function setStaple(id: number, isStaple: boolean): Promise<void> {
   await applyBulk([id], { isStaple })
 }
 
+/**
+ * Marking one item a main dish from a tile.
+ *
+ * Returns false when the rule won't allow it — a main belongs to breakfast,
+ * lunch or dinner, and there's no sensible way to guess which from a tile — so
+ * the caller can say why instead of the tap appearing to do nothing.
+ */
+export async function setMain(id: number, isMain: boolean): Promise<boolean> {
+  const item = await db.items.get(id)
+  if (!item) return false
+  if (isMain && !(item.meal && MAIN_ALLOWED.includes(item.meal))) return false
+  await applyBulk([id], { isMain })
+  return true
+}
+
 /** Deletes each row through the single-item path so holds and photos go too. */
 export async function deleteMany(ids: number[]): Promise<number> {
   let removed = 0

@@ -60,7 +60,7 @@ export default function MealTags({
           title={canBeMain ? undefined : 'Pick breakfast, lunch or dinner first'}
           onClick={() => onChange({ meal, isMain: !isMain })}
         >
-          ⭐ Main dish
+          🍽️ Main dish
         </button>
       </div>
 

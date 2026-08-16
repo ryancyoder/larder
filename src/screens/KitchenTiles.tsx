@@ -5,11 +5,12 @@ import { usePhoto } from '../app/usePhoto'
 import { categoryMeta } from '../lib/categories'
 import { freshnessOf } from '../lib/inventory'
 import { formatAmount } from '../lib/units'
-import { setStaple } from '../lib/bulk'
+import { setMain, setStaple } from '../lib/bulk'
 import TileBrowser, { isLow } from '../components/TileBrowser'
 import { Glyph } from '../components/ui'
 import ItemSheet from '../components/ItemSheet'
 import AddItemSheet from '../components/AddItemSheet'
+import { useToast } from '../app/toast'
 
 /**
  * The kitchen as a wall of tiles rather than a list.
@@ -70,6 +71,7 @@ export default function KitchenTiles({ onClose }: { onClose: () => void }) {
 }
 
 function KitchenTile({ item, onOpen }: { item: ItemView; onOpen: () => void }) {
+  const toast = useToast()
   const { url: photo, cutout } = usePhoto(item.photoId, 'thumb')
   const meta = categoryMeta(item.category)
   const fresh = freshnessOf(item)
@@ -81,7 +83,7 @@ function KitchenTile({ item, onOpen }: { item: ItemView; onOpen: () => void }) {
     // scrollbar and back again, and the rows collapse to min-content.
     <div className="pos-tile-wrap">
     <button
-      className={`pos-tile${photo ? ' has-photo' : ''}${cutout ? ' has-cutout' : ''}${item.qty <= 0 ? ' spent' : ''}`}
+      className={`pos-tile${photo ? ' has-photo' : ''}${cutout ? ' has-cutout' : ''}${item.qty <= 0 ? ' spent' : ''}${item.reserved > 0 ? ' reserved' : ''}`}
       onClick={onOpen}
       aria-label={`Open ${item.name}`}
     >
@@ -99,19 +101,32 @@ function KitchenTile({ item, onOpen }: { item: ItemView; onOpen: () => void }) {
         </span>
       </span>
 
-      {/* One flag only. Running out beats going off beats being spoken for. */}
+      {/* One flag only, and it sits inboard of the main-dish button. Being
+          reserved is drawn as a slash across the whole tile instead. */}
       {low ? (
-        <span className="pos-flag">{item.available <= 0 ? 'out' : 'low'}</span>
+        <span className="pos-flag inset">{item.available <= 0 ? 'out' : 'low'}</span>
       ) : fresh.days !== null && fresh.days <= 5 ? (
-        <span className="pos-flag warn">{fresh.days < 0 ? 'old' : `${fresh.days}d`}</span>
-      ) : item.reserved > 0 ? (
-        <span className="pos-flag held">🔒</span>
+        <span className="pos-flag warn inset">{fresh.days < 0 ? 'old' : `${fresh.days}d`}</span>
       ) : null}
     </button>
 
-      {/* A sibling rather than a child: the tile is itself a button, and one
+      {/* Siblings rather than children: the tile is itself a button, and one
           button cannot legally nest inside another. Same trick the quick-add
           clear button uses. */}
+      <button
+        className={`pos-main${item.isMain ? ' on' : ''}`}
+        aria-pressed={Boolean(item.isMain)}
+        aria-label={item.isMain ? `${item.name} is a main dish — tap to unmark` : `Mark ${item.name} as a main dish`}
+        title={item.isMain ? 'A main dish' : 'Mark as a main dish'}
+        onClick={async () => {
+          const ok = await setMain(item.id!, !item.isMain)
+          // A main belongs to a meal, and a tile can't ask which one.
+          if (!ok) toast('Give it a meal first — mains belong to breakfast, lunch or dinner')
+        }}
+      >
+        🍽️
+      </button>
+
       <button
         className={`pos-star${item.isStaple ? ' on' : ''}`}
         aria-pressed={item.isStaple}

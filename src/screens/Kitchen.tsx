@@ -173,7 +173,7 @@ export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void
             options={[
               { value: 'any' as MealFilter, label: 'Any meal' },
               ...SLOTS.map((sl) => ({ value: sl.key as MealFilter, label: `${sl.emoji} ${sl.label}` })),
-              { value: 'main' as MealFilter, label: '⭐ Mains' },
+              { value: 'main' as MealFilter, label: '🍽️ Mains' },
             ]}
           />
         </div>

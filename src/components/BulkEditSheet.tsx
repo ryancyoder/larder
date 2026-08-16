@@ -127,7 +127,7 @@ export default function BulkEditSheet({
             className={`chip toggle is-main${changes.isMain === true ? ' on' : ''}`}
             onClick={() => set('isMain', true)}
           >
-            ⭐ Mark as main
+            🍽️ Mark as main
           </button>
           <button
             type="button"

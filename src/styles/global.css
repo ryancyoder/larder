@@ -502,9 +502,9 @@ a { color: var(--accent); }
   color: var(--accent);
 }
 .chip.toggle.is-main.on {
-  background: color-mix(in srgb, var(--warn) 16%, transparent);
-  border-color: var(--warn);
-  color: var(--warn);
+  background: color-mix(in srgb, var(--accent-2) 16%, transparent);
+  border-color: var(--accent-2);
+  color: var(--accent-2);
 }
 
 .seg {
@@ -1586,3 +1586,52 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
    what you actually have. */
 .item.spent { opacity: 0.5; }
 .item.spent:hover { opacity: 0.75; }
+
+/* Main-dish toggle: mirrors the staple star, opposite corner, own colour.
+   Gold is the staple's; a main gets the cool accent so the two never read as
+   the same mark at a glance. */
+.pos-main {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 16px;
+  line-height: 1;
+  opacity: 0.32;
+  filter: grayscale(1);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+  transition: transform 0.12s var(--ease), opacity 0.15s, filter 0.15s;
+}
+.pos-main:hover { opacity: 0.6; }
+.pos-main.on {
+  opacity: 1;
+  filter: none;
+  background: color-mix(in srgb, var(--accent-2) 24%, transparent);
+  box-shadow: 0 0 0 1.5px var(--accent-2);
+}
+.pos-main:active { transform: scale(0.82); }
+
+/* The flag shares the top edge with the main-dish button now. */
+.pos-flag.inset { left: 42px; }
+.pos-grid.large .pos-flag.inset { left: 46px; }
+
+/* Reserved: a slash straight across the tile. Held stock is stock you can see
+   but must not spend, and a corner badge was too easy to miss. */
+.pos-tile.reserved::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(
+    to top right,
+    transparent calc(50% - 2px),
+    color-mix(in srgb, var(--danger) 82%, transparent) calc(50% - 2px),
+    color-mix(in srgb, var(--danger) 82%, transparent) calc(50% + 2px),
+    transparent calc(50% + 2px)
+  );
+}
