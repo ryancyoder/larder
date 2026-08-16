@@ -16,3 +16,8 @@ yarn-error.log*
 .env
 .env.*
 !.env.example
+# Tracked deliberately: it holds only the Supabase URL and publishable key,
+# both of which ship inside the client bundle anyway. The deployed build reads
+# them at build time, so ignoring this file would deploy an app with no
+# connection at all.
+!.env.production
