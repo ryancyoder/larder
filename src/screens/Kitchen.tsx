@@ -10,6 +10,7 @@ import { CatDot, Empty, ExpiryChip, FreshnessRing, Section, Seg } from '../compo
 import AddItemSheet from '../components/AddItemSheet'
 import ItemSheet from '../components/ItemSheet'
 import BulkEditSheet from '../components/BulkEditSheet'
+import KitchenTiles from './KitchenTiles'
 
 type Filter = 'all' | StorageLocation
 type MealFilter = 'any' | MealSlot | 'main'
@@ -21,6 +22,7 @@ export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void
   const [query, setQuery] = useState('')
   const [mealFilter, setMealFilter] = useState<MealFilter>('any')
   const [adding, setAdding] = useState(false)
+  const [tiling, setTiling] = useState(false)
   const [selecting, setSelecting] = useState(false)
   const [picked, setPicked] = useState<Set<number>>(new Set())
   const [bulkOpen, setBulkOpen] = useState(false)
@@ -97,6 +99,9 @@ export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void
           </div>
         </div>
         <div className="row" style={{ gap: 6 }}>
+          {!selecting && (
+            <button className="btn sm" onClick={() => setTiling(true)}>▦ Tiles</button>
+          )}
           <button className="btn ghost sm" onClick={toggleSelecting}>
             {selecting ? 'Done' : 'Select'}
           </button>
@@ -240,6 +245,7 @@ export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void
         />
       )}
       {live && <ItemSheet item={live} onClose={() => setSelected(null)} />}
+      {tiling && <KitchenTiles onClose={() => setTiling(false)} />}
     </>
   )
 }

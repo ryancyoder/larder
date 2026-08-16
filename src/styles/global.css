@@ -564,7 +564,9 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
 .sheet-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  /* Above the full-screen tile view (120): a sheet opened from a tile has to
+     land on top of the thing that opened it. Still under the toast (200). */
+  z-index: 140;
   background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(4px);
   display: flex;
@@ -1119,6 +1121,15 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
   background: color-mix(in srgb, var(--fresh-soon) 18%, transparent);
   color: var(--fresh-soon);
 }
+/* Reserved for a meal — informational, not a warning, so it stays neutral. */
+.pos-flag.held {
+  background: color-mix(in srgb, var(--text-mute) 22%, transparent);
+  color: var(--text-dim);
+}
+
+/* Nothing free left. Still tappable — restocking starts here. */
+.pos-tile.spent { opacity: 0.55; }
+.pos-tile.spent .pos-glyph { filter: grayscale(0.7); }
 
 .pos-badge {
   position: absolute;
@@ -1168,8 +1179,20 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
   border-top: 1px solid var(--line);
   background: var(--bg-1);
 }
-.pos-count { flex: 1; font-size: 13.5px; font-weight: 600; color: var(--text-dim); }
+.pos-count {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .pos-foot .btn { min-width: 120px; padding: 12px 20px; }
+/* The kitchen footer carries a second button, so this one drops the reach
+   floor rather than pushing the count off the end of a phone. */
+.pos-foot .btn.pos-add { min-width: 0; padding: 12px 15px; white-space: nowrap; }
 
 /* --------------------------------------------------------------------------
    Tile size. Regular is the default; Large trades columns for reach.
