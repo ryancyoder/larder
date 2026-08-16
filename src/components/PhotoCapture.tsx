@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { deletePhoto, savePhoto, saveCutoutPhoto } from '../lib/photos'
+import { deletePhoto, loadPhotoBlob, savePhoto, saveCutoutPhoto } from '../lib/photos'
 import { usePhoto } from '../app/usePhoto'
 import {
   CutoutError, MODEL_DOWNLOAD_MB, modelIsCached, removeBackground, webgpuAvailable,
@@ -61,7 +61,9 @@ export default function PhotoCapture({
     try {
       const { db } = await import('../db/db')
       const record = await db.photos.get(photoId)
-      const source = record?.full ?? record?.thumb
+      // The bytes live in storage now, so cutting the background out of a photo
+      // means fetching it back rather than reading it off the row.
+      const source = await loadPhotoBlob(photoId)
       if (!source) throw new CutoutError('That photo could not be read back.')
 
       const cut = await removeBackground(source, setProgress)

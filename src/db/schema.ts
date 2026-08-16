@@ -74,8 +74,14 @@ export type MealSlot = 'breakfast' | 'lunch' | 'dinner' | 'snack'
  */
 export interface Photo {
   id?: number
-  full: Blob | null
-  thumb: Blob | null
+  /**
+   * Object paths in the `photos` bucket, not the bytes. Keeping images out of
+   * the row means a kitchen full of pictures doesn't make every query heavy,
+   * and the bucket is private so these are only reachable through a signed URL.
+   */
+  fullPath?: string
+  thumbPath?: string
+  /** Only for an image we couldn't re-encode — a blocked cross-origin fetch. */
   remoteUrl?: string
   source: 'camera' | 'library' | 'openfoodfacts'
   /**

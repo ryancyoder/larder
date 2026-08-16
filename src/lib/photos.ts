@@ -1,4 +1,6 @@
 import { db } from '../db/db'
+import { supabase } from './supabase'
+import { getHouseholdId } from '../db/remote'
 import type { Photo } from '../db/schema'
 import { todayISO } from './dates'
 
@@ -58,13 +60,42 @@ export async function processImage(
   }
 }
 
+const BUCKET = 'photos'
+
+/**
+ * Puts the two sizes in the bucket and returns their paths.
+ *
+ * Uploaded before the row is written rather than after, so a failure leaves
+ * orphaned objects rather than a photo row pointing at nothing — the first is
+ * invisible, the second renders as a broken image forever.
+ *
+ * The household id leads the path because the storage policy checks the first
+ * folder segment; a file outside your own folder is rejected on upload.
+ */
+async function upload(full: Blob, thumb: Blob): Promise<{ fullPath: string; thumbPath: string }> {
+  const household = getHouseholdId()
+  if (household == null) throw new Error('Not signed in.')
+  const stem = `${household}/${crypto.randomUUID()}`
+  const fullPath = `${stem}-full.webp`
+  const thumbPath = `${stem}-thumb.webp`
+
+  const [a, b] = await Promise.all([
+    supabase.storage.from(BUCKET).upload(fullPath, full, { contentType: full.type || 'image/webp' }),
+    supabase.storage.from(BUCKET).upload(thumbPath, thumb, { contentType: thumb.type || 'image/webp' }),
+  ])
+  if (a.error) throw a.error
+  if (b.error) throw b.error
+  return { fullPath, thumbPath }
+}
+
 export async function savePhoto(
   source: Blob,
   origin: Photo['source'],
   attribution?: string,
 ): Promise<number> {
   const { full, thumb } = await processImage(source)
-  return db.photos.add({ full, thumb, source: origin, createdAt: todayISO(), attribution })
+  const paths = await upload(full, thumb)
+  return db.photos.add({ ...paths, source: origin, createdAt: todayISO(), attribution })
 }
 
 /** Stores a background-removed image, keeping its alpha channel intact. */
@@ -74,7 +105,8 @@ export async function saveCutoutPhoto(
   attribution?: string,
 ): Promise<number> {
   const { full, thumb } = await processImage(source, true)
-  return db.photos.add({ full, thumb, source: origin, cutout: true, createdAt: todayISO(), attribution })
+  const paths = await upload(full, thumb)
+  return db.photos.add({ ...paths, source: origin, cutout: true, createdAt: todayISO(), attribution })
 }
 
 /**
@@ -83,7 +115,7 @@ export async function saveCutoutPhoto(
  */
 export async function saveRemotePhoto(url: string, attribution?: string): Promise<number> {
   return db.photos.add({
-    full: null, thumb: null, remoteUrl: url,
+    remoteUrl: url,
     source: 'openfoodfacts', createdAt: todayISO(), attribution,
   })
 }
@@ -91,7 +123,11 @@ export async function saveRemotePhoto(url: string, attribution?: string): Promis
 export async function deletePhoto(photoId?: number) {
   if (photoId == null) return
   releaseCached(photoId)
+  // Read the paths before the row goes, or the objects can never be found again.
+  const photo = await db.photos.get(photoId)
+  const paths = [photo?.fullPath, photo?.thumbPath].filter(Boolean) as string[]
   await db.photos.delete(photoId)
+  if (paths.length) await supabase.storage.from(BUCKET).remove(paths)
 }
 
 /** Swaps an item's photo and cleans up the one it replaces. */
@@ -140,10 +176,18 @@ export async function loadPhotoUrl(photoId: number, size: Size): Promise<string 
     const photo = await db.photos.get(photoId)
     if (!photo) return undefined
     cutoutCache.set(photoId, Boolean(photo.cutout))
-    const blob = size === 'thumb' ? photo.thumb ?? photo.full : photo.full ?? photo.thumb
-    const url = blob ? URL.createObjectURL(blob) : photo.remoteUrl
-    if (url) urlCache.set(key, url)
-    return url
+
+    const path = size === 'thumb'
+      ? photo.thumbPath ?? photo.fullPath
+      : photo.fullPath ?? photo.thumbPath
+    if (!path) return photo.remoteUrl
+
+    // The bucket is private, so this is a signed URL. An hour outlives any
+    // session spent looking at a fridge, and a stale one simply re-signs.
+    const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600)
+    if (error) return photo.remoteUrl
+    if (data?.signedUrl) urlCache.set(key, data.signedUrl)
+    return data?.signedUrl
   })().finally(() => pending.delete(key))
 
   pending.set(key, task)
@@ -160,10 +204,32 @@ function releaseCached(photoId: number) {
   }
 }
 
-/** Rough on-disk size of all stored photos, for the Settings screen. */
+/**
+ * Downloads the stored bytes again.
+ *
+ * Background removal needs the actual image, not a URL, and since the bytes no
+ * longer sit in the row this has to fetch them. Prefers the full size — the
+ * thumbnail is too small to cut a usable mask from.
+ */
+export async function loadPhotoBlob(photoId: number): Promise<Blob | undefined> {
+  const photo = await db.photos.get(photoId)
+  const path = photo?.fullPath ?? photo?.thumbPath
+  if (!path) return undefined
+  const { data, error } = await supabase.storage.from(BUCKET).download(path)
+  if (error) return undefined
+  return data ?? undefined
+}
+
+/**
+ * How much the bucket holds, for the Settings screen. Asked of storage rather
+ * than derived from the rows, since the bytes no longer live in the database.
+ */
 export async function photoStorageBytes(): Promise<number> {
-  const photos = await db.photos.toArray()
-  return photos.reduce((sum, p) => sum + (p.full?.size ?? 0) + (p.thumb?.size ?? 0), 0)
+  const household = getHouseholdId()
+  if (household == null) return 0
+  const { data, error } = await supabase.storage.from(BUCKET).list(String(household), { limit: 1000 })
+  if (error || !data) return 0
+  return data.reduce((sum, f) => sum + ((f.metadata?.size as number | undefined) ?? 0), 0)
 }
 
 export function formatBytes(bytes: number): string {
