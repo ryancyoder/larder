@@ -9,6 +9,7 @@ import { SLOTS } from '../lib/plan'
 import { CatDot, Empty, ExpiryChip, FreshnessRing, Section, Seg } from '../components/ui'
 import AddItemSheet from '../components/AddItemSheet'
 import ItemSheet from '../components/ItemSheet'
+import BulkEditSheet from '../components/BulkEditSheet'
 
 type Filter = 'all' | StorageLocation
 type MealFilter = 'any' | MealSlot | 'main'
@@ -20,6 +21,9 @@ export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void
   const [query, setQuery] = useState('')
   const [mealFilter, setMealFilter] = useState<MealFilter>('any')
   const [adding, setAdding] = useState(false)
+  const [selecting, setSelecting] = useState(false)
+  const [picked, setPicked] = useState<Set<number>>(new Set())
+  const [bulkOpen, setBulkOpen] = useState(false)
   const [selected, setSelected] = useState<ItemView | null>(null)
 
   const visible = useMemo(() => {
@@ -49,6 +53,37 @@ export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void
     })).filter((g) => g.items.length > 0)
   }, [visible, filter, query, mealFilter, places])
 
+  const visibleIds = visible.map((i) => i.id!).filter((id) => id != null)
+  const allPicked = visibleIds.length > 0 && visibleIds.every((id) => picked.has(id))
+
+  function toggleSelecting() {
+    setSelecting((on) => !on)
+    setPicked(new Set())
+  }
+
+  /** In selection mode a tap picks the row; otherwise it opens it. */
+  function open(item: ItemView) {
+    if (!selecting) { setSelected(item); return }
+    setPicked((prev) => {
+      const next = new Set(prev)
+      if (next.has(item.id!)) next.delete(item.id!)
+      else next.add(item.id!)
+      return next
+    })
+  }
+
+  /** Selects everything currently on screen, so filters double as a picker. */
+  function toggleAllVisible() {
+    setPicked((prev) => {
+      if (allPicked) {
+        const next = new Set(prev)
+        visibleIds.forEach((id) => next.delete(id))
+        return next
+      }
+      return new Set([...prev, ...visibleIds])
+    })
+  }
+
   if (!items) return null
 
   return (
@@ -61,10 +96,15 @@ export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void
             {urgent.length > 0 && <> · <span style={{ color: 'var(--fresh-urgent)' }}>{urgent.length} need using</span></>}
           </div>
         </div>
-        <button className="btn ghost sm" onClick={onOpenSettings}>Settings</button>
+        <div className="row" style={{ gap: 6 }}>
+          <button className="btn ghost sm" onClick={toggleSelecting}>
+            {selecting ? 'Done' : 'Select'}
+          </button>
+          {!selecting && <button className="btn ghost sm" onClick={onOpenSettings}>Settings</button>}
+        </div>
       </div>
 
-      {urgent.length > 0 && (
+      {urgent.length > 0 && !selecting && (
         <Section
           title="Eat me first"
           hint={atRisk > 0 ? `$${atRisk.toFixed(2)} at risk` : undefined}
@@ -134,6 +174,22 @@ export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void
         </div>
       </section>
 
+      {selecting && (
+        <section className="section" style={{ marginTop: 12 }}>
+          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+            <button className="btn sm" onClick={toggleAllVisible}>
+              {allPicked ? 'Deselect these' : `Select all ${visibleIds.length}`}
+            </button>
+            {picked.size > 0 && (
+              <button className="btn ghost sm" onClick={() => setPicked(new Set())}>Clear</button>
+            )}
+            <span style={{ fontSize: 12.5, color: 'var(--text-mute)' }}>
+              Filter first, then select all — that's the quick way to tag a whole shelf.
+            </span>
+          </div>
+        </section>
+      )}
+
       {visible.length === 0 ? (
         <div className="section">
           <Empty emoji="🫙" title={query ? 'Nothing matches that' : 'This spot is empty'}>
@@ -144,19 +200,34 @@ export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void
         grouped.map((g) => (
           <Section key={g.loc.key} title={`${g.loc.emoji} ${g.loc.label}`} hint={g.loc.blurb}>
             <div className="stack auto-cols">
-              {g.items.map((item, i) => <ItemRow key={item.id} item={item} index={i} onClick={() => setSelected(item)} />)}
+              {g.items.map((item, i) => <ItemRow key={item.id} item={item} index={i} selecting={selecting} picked={picked.has(item.id!)} onClick={() => open(item)} />)}
             </div>
           </Section>
         ))
       ) : (
         <div className="section">
           <div className="stack auto-cols">
-            {visible.map((item, i) => <ItemRow key={item.id} item={item} index={i} onClick={() => setSelected(item)} />)}
+            {visible.map((item, i) => <ItemRow key={item.id} item={item} index={i} selecting={selecting} picked={picked.has(item.id!)} onClick={() => open(item)} />)}
           </div>
         </div>
       )}
 
-      <button className="fab" onClick={() => setAdding(true)} aria-label="Add an item">+</button>
+      {!selecting && <button className="fab" onClick={() => setAdding(true)} aria-label="Add an item">+</button>}
+
+      {selecting && picked.size > 0 && (
+        <div className="bulk-bar">
+          <span className="bulk-count">{picked.size} selected</span>
+          <button className="btn primary" onClick={() => setBulkOpen(true)}>Edit selected</button>
+        </div>
+      )}
+
+      {bulkOpen && (
+        <BulkEditSheet
+          ids={[...picked]}
+          onClose={() => setBulkOpen(false)}
+          onDone={() => { setBulkOpen(false); setSelecting(false); setPicked(new Set()) }}
+        />
+      )}
 
       {adding && <AddItemSheet onClose={() => setAdding(false)} />}
       {live && <ItemSheet item={live} onClose={() => setSelected(null)} />}
@@ -164,14 +235,24 @@ export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void
   )
 }
 
-function ItemRow({ item, index, onClick }: { item: ItemView; index: number; onClick: () => void }) {
+function ItemRow({ item, index, onClick, selecting, picked }: {
+  item: ItemView
+  index: number
+  onClick: () => void
+  selecting?: boolean
+  picked?: boolean
+}) {
   const meta = categoryMeta(item.category)
   return (
     <button
-      className={`item${item.reserved > 0 ? ' held' : ''}`}
+      className={`item${item.reserved > 0 ? ' held' : ''}${picked ? ' picked' : ''}`}
       onClick={onClick}
+      aria-pressed={selecting ? Boolean(picked) : undefined}
       style={{ animationDelay: `${Math.min(index, 10) * 22}ms` }}
     >
+      {selecting && (
+        <span className={`pick-box${picked ? ' on' : ''}`} aria-hidden>{picked ? '✓' : ''}</span>
+      )}
       <FreshnessRing item={item} />
       <div style={{ minWidth: 0, flex: 1 }}>
         <div className="name">{item.name}</div>
