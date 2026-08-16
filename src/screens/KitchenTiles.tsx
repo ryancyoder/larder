@@ -10,6 +10,7 @@ import TileBrowser, { isLow } from '../components/TileBrowser'
 import { Glyph } from '../components/ui'
 import ItemSheet from '../components/ItemSheet'
 import AddItemSheet from '../components/AddItemSheet'
+import ReservePopover from '../components/ReservePopover'
 import { useToast } from '../app/toast'
 
 /**
@@ -24,10 +25,13 @@ export default function KitchenTiles({ onClose }: { onClose: () => void }) {
   const items = useKitchen()
   const [selected, setSelected] = useState<ItemView | null>(null)
   const [addingTo, setAddingTo] = useState<string | null>(null)
+  const [holding, setHolding] = useState<ItemView | null>(null)
 
   // Follow the row rather than the snapshot, so the sheet reflects each change
   // as it's made instead of showing the quantity it opened with.
   const live = selected && items ? items.find((i) => i.id === selected.id) ?? null : null
+  // Same trick for the popover: it lists holds, which change while it's open.
+  const liveHold = holding && items ? items.find((i) => i.id === holding.id) ?? null : null
 
   return (
     <>
@@ -45,6 +49,7 @@ export default function KitchenTiles({ onClose }: { onClose: () => void }) {
             // already says, and the space is better spent on the tile.
             showMeals={!MEAL_MARKS.some((m) => m.key === filter)}
             onOpen={() => setSelected(item)}
+            onHold={() => setHolding(item)}
           />
         )}
         footer={({ place, placeKey, visible, all }) => (
@@ -67,6 +72,7 @@ export default function KitchenTiles({ onClose }: { onClose: () => void }) {
       />
 
       {live && <ItemSheet item={live} onClose={() => setSelected(null)} />}
+      {liveHold && <ReservePopover item={liveHold} onClose={() => setHolding(null)} />}
       {addingTo !== null && (
         <AddItemSheet
           onClose={() => setAddingTo(null)}
@@ -84,7 +90,7 @@ const MEAL_MARKS: Array<{ key: MealSlot; letter: string; label: string }> = [
   { key: 'dinner', letter: 'D', label: 'Dinner' },
 ]
 
-function KitchenTile({ item, showMeals, onOpen }: { item: ItemView; showMeals: boolean; onOpen: () => void }) {
+function KitchenTile({ item, showMeals, onOpen, onHold }: { item: ItemView; showMeals: boolean; onOpen: () => void; onHold: () => void }) {
   const toast = useToast()
   const { url: photo, cutout } = usePhoto(item.photoId, 'thumb')
   const meta = categoryMeta(item.category)
@@ -110,8 +116,11 @@ function KitchenTile({ item, showMeals, onOpen }: { item: ItemView; showMeals: b
       <span className="pos-label">
         <span className="pos-name">{item.name}</span>
         <span className="pos-meta">
-          {item.available <= 0 ? 'Out' : formatAmount(item.available, item.unit)}
-          {item.reserved > 0 && ` · ${formatAmount(item.reserved, item.unit)} held`}
+          {item.qty <= 0
+            ? 'Out'
+            : item.available <= 0
+              ? `All ${formatAmount(item.qty, item.unit)} held`
+              : `${formatAmount(item.available, item.unit)}${item.reserved > 0 ? ` · ${formatAmount(item.reserved, item.unit)} held` : ''}`}
         </span>
       </span>
 
@@ -159,6 +168,15 @@ function KitchenTile({ item, showMeals, onOpen }: { item: ItemView; showMeals: b
         }}
       >
         🍽️
+      </button>
+
+      <button
+        className={`pos-hold${item.reserved > 0 ? ' on' : ''}`}
+        aria-label={item.reserved > 0 ? `${item.name} is set aside — tap to change` : `Set ${item.name} aside for someone`}
+        title={item.reserved > 0 ? 'Set aside — tap to change' : 'Set aside for someone'}
+        onClick={onHold}
+      >
+        🔒
       </button>
 
       <button

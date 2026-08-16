@@ -18,7 +18,7 @@ import { Seg } from './ui'
  * being copied and left to drift apart.
  */
 
-export type Filter = 'all' | 'low' | 'empty' | 'expiring' | 'staples' | 'main' | MealSlot
+export type Filter = 'all' | 'low' | 'empty' | 'expiring' | 'staples' | 'reserved' | 'free' | 'main' | MealSlot
 export type Sort = 'name' | 'low' | 'expiring'
 type TileSize = 'regular' | 'large'
 
@@ -39,6 +39,8 @@ const FILTERS: Array<{ value: Filter; label: string }> = [
   { value: 'empty', label: 'Run out' },
   { value: 'expiring', label: 'Expiring' },
   { value: 'staples', label: 'Staples' },
+  { value: 'reserved', label: '🔒 Set aside' },
+  { value: 'free', label: 'Free' },
   { value: 'main', label: '🍽️ Mains' },
   ...SLOTS.map((s) => ({ value: s.key as Filter, label: `${s.emoji} ${s.label}` })),
 ]
@@ -116,6 +118,8 @@ export default function TileBrowser({
     if (filter === 'empty') out = out.filter((i) => i.qty <= 0)
     if (filter === 'expiring') out = out.filter(isExpiring)
     if (filter === 'staples') out = out.filter((i) => i.isStaple)
+    if (filter === 'reserved') out = out.filter((i) => i.reserved > 0)
+    if (filter === 'free') out = out.filter((i) => i.reserved === 0)
     if (filter === 'main') out = out.filter((i) => i.isMain)
     if (SLOTS.some((s) => s.key === filter)) out = out.filter((i) => i.meal === filter)
 
