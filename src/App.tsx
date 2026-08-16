@@ -5,27 +5,27 @@ import { LayoutProvider } from './app/layout'
 import { useCategories, useKitchen, useShopList } from './app/data'
 import { expiringSoon } from './lib/inventory'
 import Kitchen from './screens/Kitchen'
-import Calendar from './screens/Calendar'
-import Plan from './screens/Plan'
+import Planning from './screens/Planning'
 import Recipes from './screens/Recipes'
 import Shop from './screens/Shop'
 import Insights from './screens/Insights'
 import Settings from './screens/Settings'
 
-type Tab = 'kitchen' | 'calendar' | 'plan' | 'recipes' | 'shop' | 'insights'
+type Tab = 'kitchen' | 'plan' | 'recipes' | 'shop' | 'insights'
 
 const TABS: Array<{ key: Tab; label: string; glyph: string }> = [
   { key: 'kitchen', label: 'Kitchen', glyph: '🧊' },
-  { key: 'calendar', label: 'Calendar', glyph: '🗓️' },
-  { key: 'plan', label: 'Plan', glyph: '📅' },
+  { key: 'plan', label: 'Plan', glyph: '🗓️' },
   { key: 'recipes', label: 'Recipes', glyph: '🍳' },
   { key: 'shop', label: 'Shop', glyph: '🛒' },
   { key: 'insights', label: 'Insights', glyph: '📈' },
 ]
 
 function readTab(): Tab {
-  const hash = window.location.hash.replace('#', '') as Tab
-  return TABS.some((t) => t.key === hash) ? hash : 'kitchen'
+  const hash = window.location.hash.replace('#', '')
+  // The calendar used to be its own tab; old links still land on it.
+  if (hash === 'calendar') return 'plan'
+  return TABS.some((t) => t.key === hash) ? (hash as Tab) : 'kitchen'
 }
 
 export default function App() {
@@ -90,8 +90,7 @@ export default function App() {
           ) : (
             <>
               {tab === 'kitchen' && <Kitchen onOpenSettings={() => setSettingsOpen(true)} />}
-              {tab === 'calendar' && <Calendar />}
-              {tab === 'plan' && <Plan />}
+              {tab === 'plan' && <Planning />}
               {tab === 'recipes' && <Recipes onOpenSettings={() => setSettingsOpen(true)} />}
               {tab === 'shop' && <Shop />}
               {tab === 'insights' && <Insights onOpenSettings={() => setSettingsOpen(true)} />}

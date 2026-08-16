@@ -52,23 +52,24 @@ export default function Plan() {
 
   return (
     <>
-      <div className="topbar">
-        <div>
-          <h1>Meal plan</h1>
-          <div className="sub">
-            {weekEntries.length
-              ? `${weekEntries.length} meals planned · ${heldCount} items reserved`
-              : 'Nothing scheduled this week'}
-          </div>
-        </div>
+      <section className="section">
         <div className="row" style={{ gap: 5 }}>
+          {/* Truncates rather than wrapping into the week buttons beside it. */}
+          <span style={{
+            flex: 1, minWidth: 0, fontSize: 12.5, color: 'var(--text-mute)',
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>
+            {weekEntries.length
+              ? `${weekEntries.length} planned · ${heldCount} reserved`
+              : 'Nothing scheduled'}
+          </span>
           <button className="btn ghost sm" onClick={() => setWeekOffset((w) => w - 1)} aria-label="Previous week">‹</button>
           <button className="btn ghost sm" onClick={() => setWeekOffset(0)}>
             {weekOffset === 0 ? 'This week' : formatDate(weekStart)}
           </button>
           <button className="btn ghost sm" onClick={() => setWeekOffset((w) => w + 1)} aria-label="Next week">›</button>
         </div>
-      </div>
+      </section>
 
       {resolved === 'wide' ? (
         // Landscape: the week as an actual week, seven columns across.
