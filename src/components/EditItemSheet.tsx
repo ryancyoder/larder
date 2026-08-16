@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { Category, ItemView, MealSlot, StorageLocation, Unit } from '../db/schema'
 import { CATEGORIES } from '../lib/categories'
-import { ALL_UNITS, MEASURE_UNITS, isCountUnit } from '../lib/units'
+import { ALL_UNITS, MEASURE_UNITS, formatAmount, isCountUnit, toEachPack } from '../lib/units'
 import { adjustQuantity } from '../lib/inventory'
 import { db } from '../db/db'
 import { usePlaces } from '../app/data'
@@ -35,18 +35,56 @@ export default function EditItemSheet({ item, onClose }: { item: ItemView; onClo
   const [brand, setBrand] = useState(item.brand ?? '')
   const [meal, setMeal] = useState<MealSlot | undefined>(item.meal)
   const [isMain, setIsMain] = useState(Boolean(item.isMain))
+  const [converted, setConverted] = useState<string | null>(null)
 
   const sizeAllowed = isCountUnit(unit)
   const canSave = name.trim().length > 0 && Number(qty) >= 0
+
+  /**
+   * A main dish has to be countable, because the calendar spends one per day.
+   * Restate the item in 'ea' the moment it's marked as one — visibly, in the
+   * open fields, so the change is something you can see and undo rather than a
+   * surprise applied on save.
+   */
+  function onMealChange(next: { meal: MealSlot | undefined; isMain: boolean }) {
+    setMeal(next.meal)
+    setIsMain(next.isMain)
+    if (!next.isMain || unit === 'ea') return
+
+    const patch = toEachPack({
+      unit,
+      qty: Number(qty) || 1,
+      size: size.trim() ? Number(size) : undefined,
+      sizeUnit,
+    })
+    const before = formatAmount(Number(qty) || 1, unit)
+    if (patch.unit) setUnit(patch.unit)
+    if (patch.qty !== undefined) setQty(String(patch.qty))
+    if (patch.size !== undefined) setSize(String(patch.size))
+    if (patch.sizeUnit) setSizeUnit(patch.sizeUnit)
+    setConverted(`${before} → ${formatAmount(patch.qty ?? (Number(qty) || 1), 'ea')} ea`)
+  }
 
   async function save() {
     const nextQty = Number(qty)
     const sizeValue = sizeAllowed && size.trim() ? Number(size) : undefined
 
+    const mainNow = isMain && mainAllowedFor(meal)
+    /**
+     * A measure was restated as one countable pack (1.8 lb → 1 ea × 1.8 lb).
+     * Nothing was eaten, so the baseline has to move with it — leaving
+     * `qtyInitial` at 1.8 would price the pack per pound and draw a full
+     * package as half depleted.
+     */
+    const rebased = mainNow && item.unit !== 'ea' && !isCountUnit(item.unit)
+
     // Everything except quantity is a plain field update.
     await db.items.update(item.id!, {
       name: titleCase(name.trim()),
-      unit,
+      ...(rebased ? { qtyInitial: nextQty } : {}),
+      // The control is locked to 'ea' while main is on; enforced again here so
+      // no path can persist a main the calendar is unable to count.
+      unit: mainNow ? 'ea' : unit,
       size: sizeValue,
       sizeUnit: sizeValue != null ? sizeUnit : undefined,
       category,
@@ -61,9 +99,16 @@ export default function EditItemSheet({ item, onClose }: { item: ItemView; onClo
       isMain: isMain && mainAllowedFor(meal) ? true : undefined,
     })
 
-    // Quantity goes through the ledger path so the correction is recorded.
+    // Quantity goes through the ledger path so the correction is recorded, and
+    // so any hold too big for the new count gets trimmed. On a restatement it
+    // is handed the *new* baseline, otherwise it would raise qtyInitial straight
+    // back to the old measure.
     if (nextQty !== item.qty) {
-      await adjustQuantity({ ...item, unit }, nextQty)
+      await adjustQuantity(
+        { ...item, unit: mainNow ? 'ea' : unit, ...(rebased ? { qtyInitial: nextQty } : {}) },
+        nextQty,
+        rebased ? 'Restated as a countable pack for the meal calendar' : undefined,
+      )
     }
 
     toast(`${titleCase(name.trim())} updated`)
@@ -90,7 +135,12 @@ export default function EditItemSheet({ item, onClose }: { item: ItemView; onClo
           <input type="number" min="0" step="0.25" value={qty} onChange={(e) => setQty(e.target.value)} />
         </Field>
         <Field label="Counted in">
-          <select value={unit} onChange={(e) => setUnit(e.target.value as Unit)}>
+          <select
+            value={unit}
+            disabled={isMain}
+            title={isMain ? 'Main dishes are counted in ea' : undefined}
+            onChange={(e) => setUnit(e.target.value as Unit)}
+          >
             {ALL_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
           </select>
         </Field>
@@ -148,7 +198,14 @@ export default function EditItemSheet({ item, onClose }: { item: ItemView; onClo
         </Field>
       </div>
 
-      <MealTags meal={meal} isMain={isMain} onChange={(n) => { setMeal(n.meal); setIsMain(n.isMain) }} />
+      <MealTags meal={meal} isMain={isMain} onChange={onMealChange} />
+
+      {converted && isMain && (
+        <p className="note-convert">
+          Counted in <strong>ea</strong> now ({converted}) — the calendar spends one main dish per
+          day, so mains have to be countable. The weight moved to the size field.
+        </p>
+      )}
 
       <Field label="Brand (optional)">
         <input type="text" value={brand} onChange={(e) => setBrand(e.target.value)} />

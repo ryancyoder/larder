@@ -139,6 +139,8 @@ export default function BulkEditSheet({
         {changes.isMain === true && (
           <p style={{ fontSize: 12, color: 'var(--text-mute)', marginTop: 6 }}>
             Skipped on anything that ends up as a snack or with no meal — those can't have a main.
+            Anything not already counted in <strong>ea</strong> gets restated as one, with its weight
+            moved to the size field.
           </p>
         )}
       </div>

@@ -1,6 +1,7 @@
 import { db } from '../db/db'
 import type { Category, Item, MealSlot, StorageLocation } from '../db/schema'
 import { deleteItem } from './inventory'
+import { toEachPack } from './units'
 
 /**
  * Bulk edits.
@@ -62,6 +63,13 @@ export async function applyBulk(ids: number[], changes: BulkChanges): Promise<nu
       } else if (item.isMain && !mainAllowed) {
         // The meal moved to snack or none underneath an existing marker.
         patch.isMain = undefined
+      }
+
+      // Mains are counted in 'ea' so the calendar can spend one per day. Doing
+      // this per row rather than in the sheet means a mixed selection — some in
+      // lb, some in pkg — each converts on its own terms.
+      if (patch.isMain === true && item.unit !== 'ea') {
+        Object.assign(patch, toEachPack(item))
       }
 
       if (Object.keys(patch).length) {

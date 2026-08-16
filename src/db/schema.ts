@@ -172,6 +172,25 @@ export interface PlanEntry {
   status: 'planned' | 'cooked' | 'skipped'
 }
 
+/**
+ * A meal that actually happened — one record per date + slot.
+ *
+ * Distinct from PlanEntry, which is a *recipe* scheduled ahead of time. This is
+ * the retrospective fact behind the calendar's solid days: what filled dinner
+ * on the 14th. Recording one consumes the item, so coverage and stock can never
+ * disagree.
+ */
+export interface MealDay {
+  id?: number
+  date: string // ISO date
+  slot: MealSlot
+  /** The item eaten. Absent when it was something not tracked in the kitchen. */
+  itemId?: number
+  /** Always set — survives the item being deleted or used up later. */
+  label: string
+  createdAt: string
+}
+
 export interface ShopItem {
   id?: number
   name: string

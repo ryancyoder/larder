@@ -1250,3 +1250,196 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ==========================================================================
+   Meal calendar
+   Coverage as a month grid: solid days happened, translucent days are the
+   forecast, and where the colour stops is the next shopping trip.
+   ========================================================================== */
+
+.stack-lg { display: flex; flex-direction: column; gap: 18px; }
+.stack-sm { display: flex; flex-direction: column; gap: 6px; }
+.lbl {
+  display: block;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  color: var(--text-mute);
+  margin: 4px 0 2px;
+}
+
+.cal-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.cal-tabs button {
+  padding: 11px 8px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  color: var(--text-dim);
+  font-size: 13.5px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.cal-tabs button.on {
+  color: var(--accent-ink);
+  background: linear-gradient(140deg, var(--accent), color-mix(in srgb, var(--accent) 60%, var(--accent-2)));
+  border-color: transparent;
+}
+
+.cover-bar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--bg-1);
+}
+.cover-stat { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cover-stat strong { font-size: 20px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.cover-stat span { font-size: 11.5px; color: var(--text-mute); }
+
+.cal-nav { display: flex; align-items: center; gap: 8px; }
+.cal-nav h2 { flex: 1; font-size: 16px; font-weight: 700; text-align: center; }
+.cal-nav .btn { padding: 6px 13px; }
+
+.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.cal-dow {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-mute);
+  text-align: center;
+  padding-bottom: 2px;
+}
+
+.cal-cell {
+  position: relative;
+  /* Taller than wide: a square cell at phone width leaves ~45px, which cannot
+     hold a day number, an icon and a legible name without clipping. */
+  aspect-ratio: 0.74;
+  min-width: 0;
+  padding: 3px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--bg-1);
+  color: var(--text);
+  cursor: pointer;
+  overflow: hidden;
+  text-align: left;
+}
+.cal-cell.blank { border: none; background: none; cursor: default; }
+.cal-num {
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-mute);
+  line-height: 1;
+  padding: 1px 2px;
+}
+.cal-fill {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  border-radius: 5px;
+  padding: 1px;
+  background: var(--accent-soft);
+}
+.cal-fill img { width: 76%; max-height: 52%; object-fit: cover; border-radius: 4px; }
+.cal-fill img.cutout { object-fit: contain; }
+.cal-emoji { font-size: 15px; line-height: 1; }
+.cal-cell.cal-empty .cal-fill { display: none; }
+.cal-name {
+  font-size: 9px;
+  line-height: 1.1;
+  text-align: center;
+  color: var(--text-dim);
+  padding: 0 1px;
+  max-width: 100%;
+  /* One line, ellipsised. The full name is in the title and the day sheet. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The forecast is a guess, so it reads as one. */
+.cal-cell.cal-forecast .cal-fill { opacity: 0.45; border: 1px dashed var(--line-strong); }
+.cal-cell.cal-eaten { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.cal-cell.cal-eaten .cal-fill { opacity: 1; }
+.cal-cell.cal-eaten .cal-name { color: var(--text); font-weight: 600; }
+.cal-cell.cal-empty { background: transparent; border-style: dashed; }
+.cal-cell.past.cal-empty { opacity: 0.4; }
+.cal-cell.today { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.cal-cell.today .cal-num { color: var(--accent); font-weight: 800; }
+
+.cal-key { display: flex; flex-wrap: wrap; gap: 14px; font-size: 11.5px; color: var(--text-mute); }
+.cal-key span { display: inline-flex; align-items: center; gap: 6px; }
+.cal-key .swatch {
+  width: 12px; height: 12px; flex: none; padding: 0; border-radius: 3px; display: inline-block;
+}
+.cal-key .swatch.cal-eaten { background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); }
+.cal-key .swatch.cal-forecast { background: var(--accent-soft); opacity: 0.45; border: 1px dashed var(--line-strong); }
+.cal-key .swatch.cal-empty { border: 1px dashed var(--line-strong); }
+
+/* Picking what actually filled a day. */
+.pick-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  font-size: 14px;
+}
+.pick-row:hover:not(:disabled) { border-color: var(--line-strong); }
+.pick-row:disabled { opacity: 0.5; cursor: default; }
+.pick-row.suggested { border-color: color-mix(in srgb, var(--accent) 50%, transparent); background: var(--accent-soft); }
+.pick-name { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.pick-name small { font-size: 11.5px; color: var(--text-mute); }
+.pick-cta {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.note-convert {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-dim);
+  padding: 9px 11px;
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+/* iPad landscape: the grid can afford real cells and bigger labels. */
+:root[data-layout='wide'] .cal-grid { gap: 7px; }
+/* Wide and short, so all six rows of a month land above the fold on a
+   landscape iPad — a month view you have to scroll defeats the point. */
+:root[data-layout='wide'] .cal-cell { aspect-ratio: 1.45; padding: 5px; border-radius: var(--r-md); }
+:root[data-layout='wide'] .cal-num { font-size: 12px; }
+:root[data-layout='wide'] .cal-name {
+  font-size: 11px;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
+}
+:root[data-layout='wide'] .cal-emoji { font-size: 22px; }
+:root[data-layout='wide'] .cal-dow { font-size: 11.5px; }
+:root[data-layout='wide'] .cover-stat strong { font-size: 26px; }
+:root[data-layout='wide'] .cal-tabs { max-width: 460px; }

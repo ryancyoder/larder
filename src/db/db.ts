@@ -1,6 +1,6 @@
 import Dexie, { type Table } from 'dexie'
 import type {
-  Item, Reservation, Recipe, PlanEntry, ShopItem, Trip, LedgerEvent, Setting, Photo, StoragePlace, MealSlot,
+  Item, Reservation, Recipe, PlanEntry, ShopItem, Trip, LedgerEvent, Setting, Photo, StoragePlace, MealSlot, MealDay,
 } from './schema'
 
 /**
@@ -19,6 +19,7 @@ class LarderDB extends Dexie {
   settings!: Table<Setting, string>
   photos!: Table<Photo, number>
   places!: Table<StoragePlace, number>
+  days!: Table<MealDay, number>
 
   constructor() {
     super('larder')
@@ -55,6 +56,12 @@ class LarderDB extends Dexie {
         // A snack has no main dish, so the combination can't survive the move.
         if (item.meal === 'snack') delete item.isMain
       })
+    })
+    // v5 records the meals that actually happened, behind the calendar's solid
+    // days. `&[date+slot]` is unique on purpose: a day has one dinner, so
+    // logging a second one has to replace the first rather than stack.
+    this.version(5).stores({
+      days: '++id, &[date+slot], date, slot, itemId',
     })
   }
 }

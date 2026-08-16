@@ -5,16 +5,18 @@ import { LayoutProvider } from './app/layout'
 import { useKitchen, useShopList } from './app/data'
 import { expiringSoon } from './lib/inventory'
 import Kitchen from './screens/Kitchen'
+import Calendar from './screens/Calendar'
 import Plan from './screens/Plan'
 import Recipes from './screens/Recipes'
 import Shop from './screens/Shop'
 import Insights from './screens/Insights'
 import Settings from './screens/Settings'
 
-type Tab = 'kitchen' | 'plan' | 'recipes' | 'shop' | 'insights'
+type Tab = 'kitchen' | 'calendar' | 'plan' | 'recipes' | 'shop' | 'insights'
 
 const TABS: Array<{ key: Tab; label: string; glyph: string }> = [
   { key: 'kitchen', label: 'Kitchen', glyph: '🧊' },
+  { key: 'calendar', label: 'Calendar', glyph: '🗓️' },
   { key: 'plan', label: 'Plan', glyph: '📅' },
   { key: 'recipes', label: 'Recipes', glyph: '🍳' },
   { key: 'shop', label: 'Shop', glyph: '🛒' },
@@ -84,6 +86,7 @@ export default function App() {
           ) : (
             <>
               {tab === 'kitchen' && <Kitchen onOpenSettings={() => setSettingsOpen(true)} />}
+              {tab === 'calendar' && <Calendar />}
               {tab === 'plan' && <Plan />}
               {tab === 'recipes' && <Recipes onOpenSettings={() => setSettingsOpen(true)} />}
               {tab === 'shop' && <Shop />}

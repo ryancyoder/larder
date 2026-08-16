@@ -3,7 +3,7 @@ import type { Category, MealSlot, StorageLocation, Unit } from '../db/schema'
 import { CATEGORIES, categoryMeta, guessCategory } from '../lib/categories'
 import { placeLabel, suggestExpiry, suggestPlace } from '../lib/locations'
 import { usePlaces } from '../app/data'
-import { ALL_UNITS, MEASURE_UNITS, isCountUnit } from '../lib/units'
+import { ALL_UNITS, MEASURE_UNITS, formatAmount, isCountUnit, toEachPack } from '../lib/units'
 import { todayISO } from '../lib/dates'
 import { addItem } from '../lib/inventory'
 import { titleCase } from '../lib/match'
@@ -36,6 +36,7 @@ export default function AddItemSheet({ onClose }: { onClose: () => void }) {
   const [price, setPrice] = useState('')
   const [meal, setMeal] = useState<MealSlot | undefined>()
   const [isMain, setIsMain] = useState(false)
+  const [converted, setConverted] = useState<string | null>(null)
   const [isStaple, setIsStaple] = useState(false)
   const [parQty, setParQty] = useState('1')
 
@@ -101,15 +102,41 @@ export default function AddItemSheet({ onClose }: { onClose: () => void }) {
     }
   }
 
+  /**
+   * A main dish has to be countable — the calendar spends one per day — so
+   * marking one restates the item in 'ea' straight away, in the open fields
+   * where you can see it happen.
+   */
+  function onMealChange(next: { meal: MealSlot | undefined; isMain: boolean }) {
+    setMeal(next.meal)
+    setIsMain(next.isMain)
+    if (!next.isMain || unit === 'ea') return
+
+    const patch = toEachPack({
+      unit,
+      qty: Number(qty) || 1,
+      size: size.trim() ? Number(size) : undefined,
+      sizeUnit,
+    })
+    const before = formatAmount(Number(qty) || 1, unit)
+    if (patch.unit) setUnit(patch.unit)
+    if (patch.qty !== undefined) setQty(String(patch.qty))
+    if (patch.size !== undefined) setSize(String(patch.size))
+    if (patch.sizeUnit) setSizeUnit(patch.sizeUnit)
+    setConverted(`${before} → ${formatAmount(patch.qty ?? (Number(qty) || 1), 'ea')} ea`)
+  }
+
   async function save() {
     const amount = Number(qty)
+    const mainNow = isMain && mainAllowedFor(meal)
     await addItem({
       name: titleCase(name.trim()),
       category,
       location,
       qty: amount,
       qtyInitial: amount,
-      unit,
+      // Locked to 'ea' in the form while main is on; enforced again here.
+      unit: mainNow ? 'ea' : unit,
       size: isCountUnit(unit) && size.trim() ? Number(size) : undefined,
       sizeUnit: isCountUnit(unit) && size.trim() ? sizeUnit : undefined,
       price: price ? Number(price) : undefined,
@@ -192,7 +219,12 @@ export default function AddItemSheet({ onClose }: { onClose: () => void }) {
             <input type="number" min="0" step="0.25" value={qty} onChange={(e) => setQty(e.target.value)} />
           </Field>
           <Field label="Counted in">
-            <select value={unit} onChange={(e) => setUnit(e.target.value as Unit)}>
+            <select
+              value={unit}
+              disabled={isMain}
+              title={isMain ? 'Main dishes are counted in ea' : undefined}
+              onChange={(e) => setUnit(e.target.value as Unit)}
+            >
               {ALL_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
             </select>
           </Field>
@@ -250,7 +282,14 @@ export default function AddItemSheet({ onClose }: { onClose: () => void }) {
           </Field>
         </div>
 
-        <MealTags meal={meal} isMain={isMain} onChange={(n) => { setMeal(n.meal); setIsMain(n.isMain) }} />
+        <MealTags meal={meal} isMain={isMain} onChange={onMealChange} />
+
+        {converted && isMain && (
+          <p className="note-convert">
+            Counted in <strong>ea</strong> now ({converted}) — the calendar spends one main dish per
+            day, so mains have to be countable. The weight moved to the size field.
+          </p>
+        )}
 
         <label className="row" style={{ gap: 10, cursor: 'pointer' }}>
           <input type="checkbox" checked={isStaple} onChange={(e) => setIsStaple(e.target.checked)} />

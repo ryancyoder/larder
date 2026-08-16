@@ -2,7 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
 import { buildViews } from '../lib/inventory'
 import { sortPlaces } from '../lib/locations'
-import type { ItemView, LedgerEvent, PlanEntry, Recipe, ShopItem, StoragePlace, Trip } from '../db/schema'
+import type { ItemView, LedgerEvent, MealDay, PlanEntry, Recipe, ShopItem, StoragePlace, Trip } from '../db/schema'
 
 /** Live views over IndexedDB. Every screen reads through these, never the tables directly. */
 
@@ -30,6 +30,11 @@ export function useRecipes(): Recipe[] | undefined {
 
 export function usePlan(): PlanEntry[] | undefined {
   return useLiveQuery(() => db.plan.toArray(), [])
+}
+
+/** Meals that actually happened — the calendar's solid days. */
+export function useMealDays(): MealDay[] | undefined {
+  return useLiveQuery(() => db.days.toArray(), [])
 }
 
 export function useShopList(): ShopItem[] | undefined {

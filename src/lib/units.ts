@@ -102,6 +102,36 @@ export function formatPack(qty: number, item: Sized): string {
   return `${base} · ${formatAmount(item.size, item.sizeUnit)} each`
 }
 
+export interface Packable extends Sized {
+  qty: number
+  qtyInitial?: number
+}
+
+/**
+ * Rewrites an item into the packaged form main dishes require: counted in 'ea',
+ * with any weight or volume moved into the pack-size fields.
+ *
+ * The meal calendar treats one main dish as one day, so a main has to be
+ * countable — "2.5 lb of beef" is not a number of dinners. Rather than refuse
+ * the item, restate it: 2.5 lb becomes *1 ea × 2.5 lb*, which is both true and
+ * still comparable against a recipe asking for grams.
+ *
+ * Other count units already mean "one package of", so they carry their count
+ * straight across — 3 pkg becomes 3 ea, three dinners, pack size untouched.
+ */
+export function toEachPack(v: Packable): Partial<Packable> {
+  if (v.unit === 'ea') return {}
+  if (isCountUnit(v.unit)) return { unit: 'ea' }
+  return {
+    unit: 'ea',
+    qty: 1,
+    ...(v.qtyInitial === undefined ? {} : { qtyInitial: 1 }),
+    // The old quantity *was* the measure, so it becomes the size of the one pack.
+    size: v.qty,
+    sizeUnit: v.unit,
+  }
+}
+
 export function formatAmount(qty: number, unit: Unit): string {
   const meta = UNITS[unit]
   const n = formatQty(qty)
