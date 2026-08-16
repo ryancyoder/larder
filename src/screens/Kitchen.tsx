@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
-import type { ItemView, MealSlot, StorageLocation } from '../db/schema'
-import { useKitchen, usePlaces } from '../app/data'
+import type { ItemView, MealSlot, Person, StorageLocation } from '../db/schema'
+import { useKitchen, usePeople, usePlaces } from '../app/data'
 import { categoryMeta } from '../lib/categories'
 import { expiringSoon, freshnessOf, sortByUrgency, unitPrice } from '../lib/inventory'
 import { formatAmount } from '../lib/units'
 import { similarity } from '../lib/match'
 import { SLOTS } from '../lib/plan'
+import { personLabel } from '../lib/people'
 import { CatDot, Empty, ExpiryChip, FreshnessRing, Section, Seg } from '../components/ui'
 import AddItemSheet from '../components/AddItemSheet'
 import ItemSheet from '../components/ItemSheet'
@@ -24,6 +25,7 @@ type StockFilter = 'all' | 'in' | 'out'
 export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void }) {
   const items = useKitchen()
   const places = usePlaces() ?? []
+  const people = usePeople() ?? []
   const [filter, setFilter] = useState<Filter>('all')
   const [query, setQuery] = useState('')
   const [mealFilter, setMealFilter] = useState<MealFilter>('any')
@@ -227,14 +229,14 @@ export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void
         grouped.map((g) => (
           <Section key={g.loc.key} title={`${g.loc.emoji} ${g.loc.label}`} hint={g.loc.blurb}>
             <div className="stack auto-cols">
-              {g.items.map((item, i) => <ItemRow key={item.id} item={item} index={i} selecting={selecting} picked={picked.has(item.id!)} onClick={() => open(item)} />)}
+              {g.items.map((item, i) => <ItemRow key={item.id} item={item} index={i} people={people} selecting={selecting} picked={picked.has(item.id!)} onClick={() => open(item)} />)}
             </div>
           </Section>
         ))
       ) : (
         <div className="section">
           <div className="stack auto-cols">
-            {visible.map((item, i) => <ItemRow key={item.id} item={item} index={i} selecting={selecting} picked={picked.has(item.id!)} onClick={() => open(item)} />)}
+            {visible.map((item, i) => <ItemRow key={item.id} item={item} index={i} people={people} selecting={selecting} picked={picked.has(item.id!)} onClick={() => open(item)} />)}
           </div>
         </div>
       )}
@@ -272,9 +274,20 @@ export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void
   )
 }
 
-function ItemRow({ item, index, onClick, selecting, picked }: {
+/**
+ * Who the holds on an item are for. Several people can have a claim on the same
+ * jar, so this lists them; two is the point at which names stop fitting a chip.
+ */
+function heldFor(item: ItemView, people: Person[]): string {
+  const names = [...new Set(item.holds.map((h) => personLabel(people, h.personKey)))]
+  if (names.length <= 2) return names.join(' & ')
+  return `${names.length} people`
+}
+
+function ItemRow({ item, index, people, onClick, selecting, picked }: {
   item: ItemView
   index: number
+  people: Person[]
   onClick: () => void
   selecting?: boolean
   picked?: boolean
@@ -298,7 +311,10 @@ function ItemRow({ item, index, onClick, selecting, picked }: {
           <span>{meta.label}</span>
           <ExpiryChip item={item} />
           {item.reserved > 0 && (
-            <span className="chip tone-hold"><span className="dot" />{formatAmount(item.reserved, item.unit)} held</span>
+            <span className="chip tone-hold">
+              <span className="dot" />
+              {formatAmount(item.reserved, item.unit)} for {heldFor(item, people)}
+            </span>
           )}
           {item.isMain && <span className="chip"><span className="dot" style={{ background: 'var(--warn)' }} />main</span>}
           {item.size && item.sizeUnit && (

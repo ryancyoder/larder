@@ -2,6 +2,7 @@ import { db } from '../db/db'
 import type { ItemView, MealSlot, PlanEntry, Recipe } from '../db/schema'
 import { consume, consumeHoldsForPlan, releaseHoldsForPlan, reserve } from './inventory'
 import { scoreRecipe } from './suggest'
+import { householdKey } from './people'
 import { todayISO } from './dates'
 
 export const SLOTS: Array<{ key: MealSlot; label: string; emoji: string }> = [
@@ -33,6 +34,9 @@ export async function planMeal(
 
   const scale = recipe.servings ? servings / recipe.servings : 1
   const { lines } = scoreRecipe(recipe, stock)
+  // Planned meals are the household's — there's nobody to ask at this point,
+  // and leaving them unassigned would be the one untagged hold in the app.
+  const forHousehold = householdKey(await db.people.toArray())
 
   for (const line of lines) {
     if (!line.item || line.ingredient.optional) continue
@@ -40,7 +44,7 @@ export async function planMeal(
     if (line.needed == null) continue
     const want = line.needed * scale
     if (want <= 0) continue
-    await reserve(line.item, want, recipe.title, planId)
+    await reserve(line.item, want, recipe.title, planId, forHousehold)
   }
 
   return planId

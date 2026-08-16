@@ -8,11 +8,13 @@ import { MODEL_DOWNLOAD_MB, clearModelCache, modelIsCached } from '../lib/cutout
 import { useLayout, type LayoutMode } from '../app/layout'
 import { kindLabel, movePlace } from '../lib/locations'
 import { moveCategory } from '../lib/categories'
-import { useCategories, usePlaces } from '../app/data'
+import { movePerson } from '../lib/people'
+import { useCategories, usePeople, usePlaces } from '../app/data'
 import PlaceEditor from '../components/PlaceEditor'
 import CategoryEditor from '../components/CategoryEditor'
+import PersonEditor from '../components/PersonEditor'
 import { Glyph } from '../components/ui'
-import type { StorageCategory, StoragePlace } from '../db/schema'
+import type { Person, StorageCategory, StoragePlace } from '../db/schema'
 
 type Theme = 'dark' | 'light'
 
@@ -28,8 +30,10 @@ export default function Settings({ onClose }: { onClose: () => void }) {
   const { mode, setMode, viewportSuggests } = useLayout()
   const places = usePlaces() ?? []
   const cats = useCategories() ?? []
+  const people = usePeople() ?? []
   const [editingPlace, setEditingPlace] = useState<StoragePlace | 'new' | null>(null)
   const [editingCat, setEditingCat] = useState<StorageCategory | 'new' | null>(null)
+  const [editingPerson, setEditingPerson] = useState<Person | 'new' | null>(null)
 
   useEffect(() => {
     getSetting('anthropicKey').then((k) => setHasKey(Boolean(k)))
@@ -204,6 +208,45 @@ export default function Settings({ onClose }: { onClose: () => void }) {
 
       <div className="card card-pad stack">
         <div>
+          <div style={{ fontWeight: 650 }}>Household</div>
+          <p style={{ fontSize: 12.5, color: 'var(--text-mute)', marginTop: 4 }}>
+            Who food gets set aside for. Reserving something asks which of these it's for, so a
+            portion with someone's name on it can't be quietly eaten by anyone else.
+          </p>
+        </div>
+
+        <div className="stack" style={{ gap: 6 }}>
+          {people.map((p, i) => (
+            <div className="item" key={p.id} style={{ padding: '8px 10px' }}>
+              <span style={{ fontSize: 19, flex: 'none', width: 26, textAlign: 'center' }}>{p.emoji}</span>
+              <span className="cat-dot" style={{ background: `var(--cat-${p.hue})`, flex: 'none' }} aria-hidden />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="name" style={{ fontSize: 14 }}>{p.name}</div>
+              </div>
+              <button
+                className="btn ghost sm"
+                aria-label={`Move ${p.name} up`}
+                disabled={i === 0}
+                onClick={() => movePerson(p.id!, -1)}
+              >↑</button>
+              <button
+                className="btn ghost sm"
+                aria-label={`Move ${p.name} down`}
+                disabled={i === people.length - 1}
+                onClick={() => movePerson(p.id!, 1)}
+              >↓</button>
+              <button className="btn sm" onClick={() => setEditingPerson(p)}>Edit</button>
+            </div>
+          ))}
+        </div>
+
+        <button className="btn ghost sm" style={{ alignSelf: 'flex-start' }} onClick={() => setEditingPerson('new')}>
+          + Add someone
+        </button>
+      </div>
+
+      <div className="card card-pad stack">
+        <div>
           <div style={{ fontWeight: 650 }}>AI recipe suggestions</div>
           <p style={{ fontSize: 12.5, color: 'var(--text-mute)', marginTop: 4 }}>
             Optional. Everything else works without it — the ranking engine already sorts your own
@@ -327,6 +370,13 @@ export default function Settings({ onClose }: { onClose: () => void }) {
           category={editingCat === 'new' ? undefined : editingCat}
           allCategories={cats}
           onClose={() => setEditingCat(null)}
+        />
+      )}
+      {editingPerson && (
+        <PersonEditor
+          person={editingPerson === 'new' ? undefined : editingPerson}
+          allPeople={people}
+          onClose={() => setEditingPerson(null)}
         />
       )}
     </Sheet>

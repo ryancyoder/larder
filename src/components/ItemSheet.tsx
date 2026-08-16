@@ -4,7 +4,8 @@ import type { ItemView, StorageLocation } from '../db/schema'
 import { categoryMeta } from '../lib/categories'
 import { placeEmoji, placeLabel } from '../lib/locations'
 import { SLOTS } from '../lib/plan'
-import { usePlaces } from '../app/data'
+import { usePeople, usePlaces } from '../app/data'
+import { personLabel } from '../lib/people'
 import { formatAmount, formatPack, isCountUnit, packTotal } from '../lib/units'
 import { adjustQuantity, consume, deleteItem, freshnessOf, releaseHold, reserve, unitPrice, waste } from '../lib/inventory'
 import { db } from '../db/db'
@@ -26,6 +27,7 @@ export default function ItemSheet({ item, onClose }: { item: ItemView; onClose: 
   const [amount, setAmount] = useState(String(item.available || item.qty))
   const [reason, setReason] = useState('')
   const [label, setLabel] = useState('')
+  const [personKey, setPersonKey] = useState('')
   const [fetchingNutrition, setFetchingNutrition] = useState(false)
   const [nutritionNote, setNutritionNote] = useState('')
 
@@ -33,6 +35,7 @@ export default function ItemSheet({ item, onClose }: { item: ItemView; onClose: 
   const fresh = freshnessOf(item)
   const perUnit = unitPrice(item)
   const places = usePlaces() ?? []
+  const people = usePeople() ?? []
   const { url: hero, cutout: heroCutout } = usePhoto(item.photoId, 'full')
   const total = packTotal(item.qty, item)
   const credit = useLiveQuery(
@@ -55,7 +58,7 @@ export default function ItemSheet({ item, onClose }: { item: ItemView; onClose: 
   }
 
   async function doHold() {
-    await reserve(item, Number(amount) || 0, label.trim() || 'Saved for later')
+    await reserve(item, Number(amount) || 0, label.trim() || 'Saved for later', undefined, personKey)
     toast(`${formatAmount(Number(amount), item.unit)} of ${item.name} is now off limits`)
     onClose()
   }
@@ -140,7 +143,10 @@ export default function ItemSheet({ item, onClose }: { item: ItemView; onClose: 
           <div className="stack" style={{ gap: 6 }}>
             {item.holds.map((h) => (
               <div className="row" key={h.id} style={{ fontSize: 13 }}>
-                <span style={{ color: 'var(--text-dim)' }}>{h.label}</span>
+                <span style={{ color: 'var(--text-dim)' }}>
+                  {personLabel(people, h.personKey)}
+                  {h.label && h.label !== 'Saved for later' && ` · ${h.label}`}
+                </span>
                 <span className="spacer" />
                 <span className="tabular" style={{ color: 'var(--text-mute)' }}>{formatAmount(h.qty, item.unit)}</span>
                 <button className="btn ghost sm" onClick={() => releaseHold(h.id!)}>Release</button>
@@ -271,9 +277,31 @@ export default function ItemSheet({ item, onClose }: { item: ItemView; onClose: 
           )}
 
           {mode === 'hold' && (
-            <Field label="Saving it for">
-              <input type="text" placeholder="Sunday roast" value={label} onChange={(e) => setLabel(e.target.value)} />
-            </Field>
+            <>
+              <div className="field">
+                <label>Who is it for?</label>
+                <div className="tag-row">
+                  {people.map((p) => (
+                    <button
+                      key={p.key}
+                      type="button"
+                      className={`chip toggle${personKey === p.key ? ' on' : ''}`}
+                      aria-pressed={personKey === p.key}
+                      onClick={() => setPersonKey(p.key)}
+                    >
+                      {p.emoji} {p.name}
+                    </button>
+                  ))}
+                </div>
+                <p style={{ fontSize: 12, color: 'var(--text-mute)', marginTop: 6 }}>
+                  Setting food aside without saying who it's for is how it ends up eaten by someone
+                  else, so this one is required. Edit the household in Settings.
+                </p>
+              </div>
+              <Field label="What for? (optional)">
+                <input type="text" placeholder="Sunday roast" value={label} onChange={(e) => setLabel(e.target.value)} />
+              </Field>
+            </>
           )}
 
           {mode === 'toss' && perUnit > 0 && (
@@ -288,7 +316,7 @@ export default function ItemSheet({ item, onClose }: { item: ItemView; onClose: 
               className="btn primary"
               style={{ flex: 1 }}
               onClick={mode === 'use' ? doUse : mode === 'toss' ? doToss : doHold}
-              disabled={!(Number(amount) > 0)}
+              disabled={!(Number(amount) > 0) || (mode === 'hold' && !personKey)}
             >
               {mode === 'use' ? 'Log it' : mode === 'toss' ? 'Log the waste' : 'Reserve it'}
             </button>

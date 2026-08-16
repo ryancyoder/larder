@@ -187,6 +187,22 @@ export interface Item {
 }
 
 /**
+ * Someone a meal can be set aside for. A household, not a user list — there are
+ * no accounts and nothing signs in. "Littles" and "Family meal" sit alongside
+ * names because that's how food actually gets allocated.
+ */
+export interface Person {
+  id?: number
+  /** Stable slug referenced by reservations. Never changes once created. */
+  key: string
+  name: string
+  emoji: string
+  /** Palette slot; resolves to --cat-<hue> in global.css. */
+  hue: string
+  order: number
+}
+
+/**
  * A hold placed on part of an item — "this is saved for Thursday's curry."
  * Available quantity = item.qty - sum(reservations for that item).
  */
@@ -196,6 +212,12 @@ export interface Reservation {
   qty: number
   /** Meal-plan entry this hold belongs to, if any. Manual holds have none. */
   planId?: number
+  /**
+   * Who it's for. Required when holding by hand; plan-generated holds default
+   * to the household, since a planned meal is everyone's unless said otherwise.
+   * Optional on the type because holds made before this existed have none.
+   */
+  personKey?: string
   label: string
   createdAt: string
 }

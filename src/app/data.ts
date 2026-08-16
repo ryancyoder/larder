@@ -3,8 +3,9 @@ import { db } from '../db/db'
 import { buildViews } from '../lib/inventory'
 import { sortPlaces } from '../lib/locations'
 import { setCategoryRegistry, sortCategories } from '../lib/categories'
+import { sortPeople } from '../lib/people'
 import type {
-  Combo, ItemView, LedgerEvent, MealDay, PlanEntry, Recipe, ShopItem, StorageCategory, StoragePlace, Trip,
+  Combo, ItemView, LedgerEvent, MealDay, Person, PlanEntry, Recipe, ShopItem, StorageCategory, StoragePlace, Trip,
 } from '../db/schema'
 
 /** Live views over IndexedDB. Every screen reads through these, never the tables directly. */
@@ -43,6 +44,11 @@ export function useMealDays(): MealDay[] | undefined {
 /** Combinations, newest habits first — resolution against stock happens in the view. */
 export function useCombos(): Combo[] | undefined {
   return useLiveQuery(() => db.combos.toArray(), [])
+}
+
+/** The household, in the user's chosen order. */
+export function usePeople(): Person[] | undefined {
+  return useLiveQuery(async () => sortPeople(await db.people.toArray()), [])
 }
 
 export function useShopList(): ShopItem[] | undefined {

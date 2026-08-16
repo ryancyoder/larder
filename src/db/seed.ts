@@ -3,6 +3,7 @@ import type { Category, Item, LedgerEvent, Recipe, StorageLocation, Unit } from 
 import { addDays, startOfWeek, todayISO } from '../lib/dates'
 import { DEFAULT_PLACES, ensurePlaces } from '../lib/locations'
 import { DEFAULT_CATEGORIES, ensureCategories } from '../lib/categories'
+import { DEFAULT_PEOPLE, ensurePeople } from '../lib/people'
 
 /**
  * A believable kitchen so every screen has something to show on first run.
@@ -331,6 +332,7 @@ export async function seedIfEmpty(): Promise<void> {
   // install keeps all its items but starts with those tables empty.
   await ensurePlaces()
   await ensureCategories()
+  await ensurePeople()
   if (inFlight) return inFlight
   if ((await getSetting('seeded')) === '1') return
   inFlight = runSeed().finally(() => { inFlight = null })
@@ -340,15 +342,16 @@ export async function seedIfEmpty(): Promise<void> {
 export async function runSeed(): Promise<void> {
   const today = todayISO()
 
-  await db.transaction('rw', [db.items, db.recipes, db.plan, db.shop, db.trips, db.events, db.reservations, db.settings, db.photos, db.places, db.cats], async () => {
+  await db.transaction('rw', [db.items, db.recipes, db.plan, db.shop, db.trips, db.events, db.reservations, db.settings, db.photos, db.places, db.cats, db.people], async () => {
     await Promise.all([
       db.items.clear(), db.recipes.clear(), db.plan.clear(), db.shop.clear(),
       db.trips.clear(), db.events.clear(), db.reservations.clear(), db.photos.clear(),
-      db.places.clear(), db.cats.clear(),
+      db.places.clear(), db.cats.clear(), db.people.clear(),
     ])
     // The demo kitchen assumes the default locations and categories exist.
     await db.places.bulkAdd(DEFAULT_PLACES as never[])
     await db.cats.bulkAdd(DEFAULT_CATEGORIES as never[])
+    await db.people.bulkAdd(DEFAULT_PEOPLE as never[])
 
     const items: Item[] = PANTRY.map(([name, category, location, qty, unit, price, expires, par]) => ({
       name, category, location, qty, qtyInitial: qty, unit, price,

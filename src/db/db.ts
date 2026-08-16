@@ -1,7 +1,7 @@
 import Dexie, { type Table } from 'dexie'
 import type {
   Item, Reservation, Recipe, PlanEntry, ShopItem, Trip, LedgerEvent, Setting, Photo, StoragePlace,
-  StorageCategory, MealSlot, MealDay, Combo,
+  StorageCategory, MealSlot, MealDay, Combo, Person,
 } from './schema'
 
 /**
@@ -23,6 +23,7 @@ class LarderDB extends Dexie {
   days!: Table<MealDay, number>
   cats!: Table<StorageCategory, number>
   combos!: Table<Combo, number>
+  people!: Table<Person, number>
 
   constructor() {
     super('larder')
@@ -85,6 +86,13 @@ class LarderDB extends Dexie {
       await tx.table('items').toCollection().modify((item: Item) => {
         if (item.archived) item.archived = false
       })
+    })
+    // v9 lets a hold say who it's for. Seeded by ensurePeople() at boot for the
+    // same reason locations and categories are — an install that skipped a
+    // version still ends up with a household.
+    this.version(9).stores({
+      people: '++id, &key, order',
+      reservations: '++id, itemId, planId, personKey',
     })
   }
 }

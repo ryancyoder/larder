@@ -131,8 +131,16 @@ export async function waste(item: Item, qty: number, reason?: string) {
   await logAndApply(item, qty, 'waste', reason)
 }
 
-/** Places a hold. Never reserves more than is actually free. */
-export async function reserve(item: ItemView, qty: number, label: string, planId?: number) {
+/**
+ * Places a hold. Never reserves more than is actually free.
+ *
+ * `personKey` says who the portion is for. The UI requires one; it stays
+ * optional here so a caller with no opinion — a meal plan holding for the
+ * household — doesn't have to invent an answer.
+ */
+export async function reserve(
+  item: ItemView, qty: number, label: string, planId?: number, personKey?: string,
+) {
   if (!item.id) return
   const amount = Math.min(qty, item.available)
   if (amount <= 0) return
@@ -140,6 +148,7 @@ export async function reserve(item: ItemView, qty: number, label: string, planId
     itemId: item.id,
     qty: Math.round(amount * 1000) / 1000,
     planId,
+    personKey,
     label,
     createdAt: todayISO(),
   })
