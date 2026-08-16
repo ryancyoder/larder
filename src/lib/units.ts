@@ -35,6 +35,14 @@ export function dimensionOf(unit: Unit): Dimension {
   return UNITS[unit].dim
 }
 
+/** Counted things ('ea', 'can', 'pkg') can carry a pack size; 'lb' cannot. */
+export function isCountUnit(unit: Unit): boolean {
+  return UNITS[unit].dim === 'count'
+}
+
+/** Units offered for the pack-size field — only real measures. */
+export const MEASURE_UNITS = ALL_UNITS.filter((u) => UNITS[u].dim !== 'count')
+
 /** Count units that are genuinely interchangeable. A clove is not a head. */
 const COUNT_INTERCHANGEABLE = new Set<Unit>(['ea', 'dozen'])
 
@@ -69,6 +77,29 @@ export function formatQty(qty: number): string {
     if (Math.abs(frac - value) < 0.02) return whole ? `${whole}${glyph}` : glyph
   }
   return String(rounded)
+}
+
+export interface Sized {
+  unit: Unit
+  size?: number
+  sizeUnit?: Unit
+}
+
+/**
+ * Total measure held across every package — 3 cans × 400 g = 1200 g.
+ * Null when the item has no pack size, which is the honest answer rather than
+ * a guess.
+ */
+export function packTotal(qty: number, item: Sized): { value: number; unit: Unit } | null {
+  if (!item.size || !item.sizeUnit || !isCountUnit(item.unit)) return null
+  return { value: qty * item.size, unit: item.sizeUnit }
+}
+
+/** "3 cans · 400g each" — the count leads, because that's what you count. */
+export function formatPack(qty: number, item: Sized): string {
+  const base = formatAmount(qty, item.unit)
+  if (!item.size || !item.sizeUnit || !isCountUnit(item.unit)) return base
+  return `${base} · ${formatAmount(item.size, item.sizeUnit)} each`
 }
 
 export function formatAmount(qty: number, unit: Unit): string {

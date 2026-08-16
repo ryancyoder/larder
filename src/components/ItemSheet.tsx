@@ -4,8 +4,8 @@ import type { ItemView, StorageLocation } from '../db/schema'
 import { categoryMeta } from '../lib/categories'
 import { placeEmoji, placeLabel } from '../lib/locations'
 import { usePlaces } from '../app/data'
-import { formatAmount } from '../lib/units'
-import { consume, deleteItem, freshnessOf, releaseHold, reserve, unitPrice, waste } from '../lib/inventory'
+import { formatAmount, formatPack, isCountUnit, packTotal } from '../lib/units'
+import { adjustQuantity, consume, deleteItem, freshnessOf, releaseHold, reserve, unitPrice, waste } from '../lib/inventory'
 import { db } from '../db/db'
 import { relativeDays } from '../lib/dates'
 import { ExpiryChip, Field, FreshnessRing, Sheet } from './ui'
@@ -13,9 +13,10 @@ import { useToast } from '../app/toast'
 import { usePhoto } from '../app/usePhoto'
 import { setItemPhoto } from '../lib/photos'
 import PhotoCapture from './PhotoCapture'
+import EditItemSheet from './EditItemSheet'
 import { db as database } from '../db/db'
 
-type Mode = 'menu' | 'use' | 'toss' | 'hold' | 'photo'
+type Mode = 'menu' | 'use' | 'toss' | 'hold' | 'photo' | 'edit'
 
 export default function ItemSheet({ item, onClose }: { item: ItemView; onClose: () => void }) {
   const toast = useToast()
@@ -29,6 +30,7 @@ export default function ItemSheet({ item, onClose }: { item: ItemView; onClose: 
   const perUnit = unitPrice(item)
   const places = usePlaces() ?? []
   const { url: hero, cutout: heroCutout } = usePhoto(item.photoId, 'full')
+  const total = packTotal(item.qty, item)
   const credit = useLiveQuery(
     async () => (item.photoId == null ? undefined : (await database.photos.get(item.photoId))?.attribution),
     [item.photoId],
@@ -54,6 +56,12 @@ export default function ItemSheet({ item, onClose }: { item: ItemView; onClose: 
     onClose()
   }
 
+  /** Whole units for counted things; halves for anything measured. */
+  async function bump(direction: 1 | -1) {
+    const step = isCountUnit(item.unit) ? 1 : 0.5
+    await adjustQuantity(item, item.qty + direction * step)
+  }
+
   async function move(location: StorageLocation) {
     if (!item.id) return
     await db.items.update(item.id, { location })
@@ -73,8 +81,13 @@ export default function ItemSheet({ item, onClose }: { item: ItemView; onClose: 
         <FreshnessRing item={item} big showPhoto={!hero} />
         <div>
           <div style={{ fontSize: 21, fontWeight: 700, letterSpacing: '-0.03em' }}>
-            {formatAmount(item.qty, item.unit)}
+            {formatPack(item.qty, item)}
           </div>
+          {total && (
+            <div style={{ fontSize: 12.5, color: 'var(--text-mute)', marginTop: 1 }}>
+              {formatAmount(total.value, total.unit)} in total
+            </div>
+          )}
           <div className="row" style={{ gap: 6, flexWrap: 'wrap', marginTop: 5 }}>
             <span className="chip"><span className="dot" style={{ background: `var(--cat-${meta.hue})` }} />{meta.label}</span>
             <span className="chip">{placeEmoji(places, item.location)} {placeLabel(places, item.location)}</span>
@@ -106,6 +119,26 @@ export default function ItemSheet({ item, onClose }: { item: ItemView; onClose: 
 
       {mode === 'menu' && (
         <>
+          {/* The common correction — "there are actually three" — shouldn't
+              require opening a form. */}
+          <div className="card card-pad row" style={{ justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-mute)' }}>
+                Quantity
+              </div>
+              <div style={{ fontSize: 12.5, color: 'var(--text-mute)', marginTop: 2 }}>
+                Corrections are logged separately from eating or binning
+              </div>
+            </div>
+            <div className="row" style={{ gap: 8, flex: 'none' }}>
+              <button className="btn" aria-label="One fewer" disabled={item.qty <= 0} onClick={() => bump(-1)}>−</button>
+              <span className="tabular" style={{ minWidth: 58, textAlign: 'center', fontWeight: 700, fontSize: 17 }}>
+                {formatAmount(item.qty, item.unit)}
+              </span>
+              <button className="btn" aria-label="One more" onClick={() => bump(1)}>+</button>
+            </div>
+          </div>
+
           <div className="grid-2">
             <button className="btn" onClick={() => { setMode('use'); setAmount(String(item.available || item.qty)) }}>🍽️ Used some</button>
             <button className="btn" onClick={() => { setMode('toss'); setAmount(String(item.qty)) }}>🗑️ Threw out</button>
@@ -115,6 +148,7 @@ export default function ItemSheet({ item, onClose }: { item: ItemView; onClose: 
             <button className="btn" onClick={() => setMode('photo')}>
               {hero ? '🖼️ Change photo' : '📷 Add a photo'}
             </button>
+            <button className="btn" onClick={() => setMode('edit')}>✏️ Edit details</button>
             <button
               className="btn danger"
               style={{ gridColumn: '1 / -1' }}
@@ -148,6 +182,10 @@ export default function ItemSheet({ item, onClose }: { item: ItemView; onClose: 
         </>
       )}
 
+      {mode === 'edit' && (
+        <EditItemSheet item={item} onClose={() => { setMode('menu'); onClose() }} />
+      )}
+
       {mode === 'photo' && (
         <div className="card card-pad stack">
           <PhotoCapture
@@ -162,7 +200,7 @@ export default function ItemSheet({ item, onClose }: { item: ItemView; onClose: 
         </div>
       )}
 
-      {mode !== 'menu' && mode !== 'photo' && (
+      {(mode === 'use' || mode === 'toss' || mode === 'hold') && (
         <div className="card card-pad stack">
           <Field label={`How much? (${item.unit})`}>
             <input type="number" min="0" step="0.25" max={mode === 'hold' ? item.available : item.qty} value={amount} onChange={(e) => setAmount(e.target.value)} autoFocus />

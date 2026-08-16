@@ -163,6 +163,43 @@ export async function consumeHoldsForPlan(planId: number, label: string) {
   await db.reservations.where('planId').equals(planId).delete()
 }
 
+/**
+ * A manual correction — "actually there are three, not two".
+ *
+ * Recorded as an `adjust` ledger event rather than a consume or a waste,
+ * because it is neither: nothing was eaten and nothing was binned, the count
+ * was simply wrong. Insights ignores `adjust` for exactly that reason, so a
+ * correction never distorts spend or waste.
+ */
+export async function adjustQuantity(item: Item, newQty: number, reason?: string) {
+  if (!item.id) return
+  const target = Math.max(0, Math.round(newQty * 1000) / 1000)
+  const delta = Math.round((target - item.qty) * 1000) / 1000
+  if (delta === 0) return
+
+  await db.transaction('rw', db.items, db.events, db.reservations, async () => {
+    await db.events.add({
+      type: 'adjust',
+      itemId: item.id,
+      name: item.name,
+      category: item.category,
+      qty: delta,
+      unit: item.unit,
+      value: Math.round(unitPrice(item) * delta * 100) / 100,
+      date: todayISO(),
+      reason: reason ?? 'Count corrected by hand',
+    })
+    await db.items.update(item.id!, {
+      qty: target,
+      // Correcting upward past the original amount makes that the new baseline,
+      // otherwise unit price and the depletion ring go wrong.
+      qtyInitial: Math.max(item.qtyInitial, target),
+      archived: target <= 0 && !item.isStaple,
+    })
+    await trimHolds(item.id!, target)
+  })
+}
+
 export async function addItem(item: Omit<Item, 'id'>): Promise<number> {
   const id = await db.items.add(item as Item)
   if (item.price) {

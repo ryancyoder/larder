@@ -32,6 +32,25 @@ export interface Suggestion {
 
 const RESCUE_WINDOW = 4
 
+/**
+ * How much of `item` a recipe line needs, in the item's own counting unit.
+ * Tries a direct conversion first, then falls back to the pack size — "400 g
+ * tomatoes" against "cans of 400 g" is one can, which a direct conversion
+ * between 'g' and 'can' could never work out.
+ */
+export function neededInItemUnits(ing: Ingredient, item: ItemView): number | null {
+  if (ing.qty == null || !ing.unit) return null
+
+  const direct = convert(ing.qty, ing.unit, item.unit)
+  if (direct != null) return direct
+
+  if (item.size && item.sizeUnit) {
+    const inPackUnits = convert(ing.qty, ing.unit, item.sizeUnit)
+    if (inPackUnits != null) return inPackUnits / item.size
+  }
+  return null
+}
+
 function resolveLine(ing: Ingredient, stock: ItemView[]): MatchLine {
   const item = bestMatch(ing.name, stock, (i) => i.name)
 
@@ -39,9 +58,9 @@ function resolveLine(ing: Ingredient, stock: ItemView[]): MatchLine {
     return { ingredient: ing, item: null, needed: null, status: isAssumedStaple(ing.name) ? 'assumed' : 'missing' }
   }
 
-  // No stated quantity, or units that can't be compared (2 cups flour vs a 5lb bag):
-  // owning the ingredient at all is good enough to call it covered.
-  const needed = ing.qty != null && ing.unit ? convert(ing.qty, ing.unit, item.unit) : null
+  // No stated quantity, or units that still can't be compared even via pack
+  // size: owning the ingredient at all is good enough to call it covered.
+  const needed = neededInItemUnits(ing, item)
   if (needed == null) {
     return { ingredient: ing, item, needed: null, status: item.available > 0 ? 'have' : 'reserved' }
   }

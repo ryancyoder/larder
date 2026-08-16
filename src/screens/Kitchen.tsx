@@ -166,6 +166,9 @@ function ItemRow({ item, index, onClick }: { item: ItemView; index: number; onCl
           {item.reserved > 0 && (
             <span className="chip tone-hold"><span className="dot" />{formatAmount(item.reserved, item.unit)} held</span>
           )}
+          {item.size && item.sizeUnit && (
+            <span>· {formatAmount(item.size, item.sizeUnit)} each</span>
+          )}
           {item.isStaple && item.available < (item.parQty ?? 0) && (
             <span className="chip tone-urgent"><span className="dot" />running low</span>
           )}

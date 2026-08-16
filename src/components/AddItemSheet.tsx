@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import type { Category, StorageLocation, Unit } from '../db/schema'
 import { CATEGORIES, categoryMeta, guessCategory } from '../lib/categories'
 import { placeLabel, suggestExpiry, suggestPlace } from '../lib/locations'
 import { usePlaces } from '../app/data'
-import { ALL_UNITS } from '../lib/units'
+import { ALL_UNITS, MEASURE_UNITS, isCountUnit } from '../lib/units'
 import { todayISO } from '../lib/dates'
 import { addItem } from '../lib/inventory'
 import { titleCase } from '../lib/match'
@@ -28,8 +28,10 @@ export default function AddItemSheet({ onClose }: { onClose: () => void }) {
   const [expiryOverride, setExpiryOverride] = useState('')
 
   const [qty, setQty] = useState('1')
+  // 'ea' always — you count packages, and the measure goes in the size field.
   const [unit, setUnit] = useState<Unit>('ea')
-  const [unitTouched, setUnitTouched] = useState(false)
+  const [size, setSize] = useState('')
+  const [sizeUnit, setSizeUnit] = useState<Unit>('g')
   const [price, setPrice] = useState('')
   const [isStaple, setIsStaple] = useState(false)
   const [parQty, setParQty] = useState('1')
@@ -48,10 +50,6 @@ export default function AddItemSheet({ onClose }: { onClose: () => void }) {
   const expiresAt = touchedExpiry ? expiryOverride : suggestExpiry(places, category, location)
   const meta = categoryMeta(category)
 
-  const suggestedUnit = useMemo(() => meta.defaultUnit, [meta])
-  const effectiveUnit = !unitTouched && unit === 'ea' && suggestedUnit !== 'ea' && !touchedCategory
-    ? suggestedUnit
-    : unit
 
   const canSave = name.trim().length > 0 && Number(qty) > 0
 
@@ -85,10 +83,11 @@ export default function AddItemSheet({ onClose }: { onClose: () => void }) {
       setBrand(product.brand)
       setTouchedCategory(true)
       setCategoryOverride(product.category)
+      // "400 g" describes one package, not how many you have — so it belongs
+      // in the size field, with the count left at 1.
       if (product.qty && product.unit) {
-        setQty(String(product.qty))
-        setUnit(product.unit)
-        setUnitTouched(true)
+        setSize(String(product.qty))
+        setSizeUnit(product.unit)
       }
       const imported = await importProductPhoto(product)
       if (imported != null) swapPhoto(imported)
@@ -107,7 +106,9 @@ export default function AddItemSheet({ onClose }: { onClose: () => void }) {
       location,
       qty: amount,
       qtyInitial: amount,
-      unit: effectiveUnit,
+      unit,
+      size: isCountUnit(unit) && size.trim() ? Number(size) : undefined,
+      sizeUnit: isCountUnit(unit) && size.trim() ? sizeUnit : undefined,
       price: price ? Number(price) : undefined,
       purchasedAt: todayISO(),
       expiresAt: expiresAt || undefined,
@@ -185,12 +186,32 @@ export default function AddItemSheet({ onClose }: { onClose: () => void }) {
           <Field label="Quantity">
             <input type="number" min="0" step="0.25" value={qty} onChange={(e) => setQty(e.target.value)} />
           </Field>
-          <Field label="Unit">
-            <select value={effectiveUnit} onChange={(e) => { setUnitTouched(true); setUnit(e.target.value as Unit) }}>
+          <Field label="Counted in">
+            <select value={unit} onChange={(e) => setUnit(e.target.value as Unit)}>
               {ALL_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
             </select>
           </Field>
         </div>
+
+        {isCountUnit(unit) && (
+          <div className="grid-2">
+            <Field label="Size of each (optional)">
+              <input
+                type="number"
+                min="0"
+                step="any"
+                placeholder="500"
+                value={size}
+                onChange={(e) => setSize(e.target.value)}
+              />
+            </Field>
+            <Field label="Measured in">
+              <select value={sizeUnit} onChange={(e) => setSizeUnit(e.target.value as Unit)}>
+                {MEASURE_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+              </select>
+            </Field>
+          </div>
+        )}
 
         <div className="grid-2">
           <Field label="Category">
@@ -235,7 +256,7 @@ export default function AddItemSheet({ onClose }: { onClose: () => void }) {
         </label>
 
         {isStaple && (
-          <Field label={`Restock when below (${effectiveUnit})`}>
+          <Field label={`Restock when below (${unit})`}>
             <input type="number" min="0" step="0.5" value={parQty} onChange={(e) => setParQty(e.target.value)} />
           </Field>
         )}

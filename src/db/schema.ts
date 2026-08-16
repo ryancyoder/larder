@@ -83,7 +83,18 @@ export interface Item {
   qty: number
   /** Quantity when it entered the kitchen — used for unit price + depletion %. */
   qtyInitial: number
+  /**
+   * The packaged unit you count in — usually 'ea', but also 'can', 'pkg', 'loaf'.
+   * Can still be a measure ('lb', 'g') for loose goods bought by weight.
+   */
   unit: Unit
+  /**
+   * How much is in *one* of those units: 2 ea × 500 g. Optional, and only
+   * meaningful when `unit` is a count. This is what lets a recipe asking for
+   * "400 g tomatoes" be compared against "2 cans" instead of giving up.
+   */
+  size?: number
+  sizeUnit?: Unit
   /** Total paid for `qtyInitial`, in dollars. */
   price?: number
   purchasedAt: string // ISO date (yyyy-mm-dd)

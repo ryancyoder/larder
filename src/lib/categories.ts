@@ -1,4 +1,4 @@
-import type { Category, StorageKind, Unit } from '../db/schema'
+import type { Category, StorageKind } from '../db/schema'
 
 export interface CategoryMeta {
   key: Category
@@ -11,7 +11,6 @@ export interface CategoryMeta {
    * location — so a user-added "Garage fridge" inherits the chilled figures.
    */
   shelfLife: Partial<Record<StorageKind, number>>
-  defaultUnit: Unit
   /** Sort order on the shopping list — roughly a supermarket walk. */
   aisle: number
   /** Where this category naturally goes, if such a place exists. */
@@ -19,18 +18,18 @@ export interface CategoryMeta {
 }
 
 export const CATEGORIES: CategoryMeta[] = [
-  { key: 'produce',   label: 'Produce',    emoji: '🥬', hue: 'produce',   aisle: 1, defaultUnit: 'ea',  homeKind: 'chilled', shelfLife: { chilled: 7, counter: 4, frozen: 240, pantry: 10 } },
-  { key: 'bakery',    label: 'Bakery',     emoji: '🥖', hue: 'bakery',    aisle: 2, defaultUnit: 'loaf', homeKind: 'counter', shelfLife: { counter: 4, pantry: 5, chilled: 10, frozen: 90 } },
-  { key: 'protein',   label: 'Meat & fish', emoji: '🥩', hue: 'protein',  aisle: 3, defaultUnit: 'lb',  homeKind: 'chilled', shelfLife: { chilled: 3, frozen: 180, pantry: 730 } },
-  { key: 'dairy',     label: 'Dairy & eggs', emoji: '🥛', hue: 'dairy',   aisle: 4, defaultUnit: 'ea',  homeKind: 'chilled', shelfLife: { chilled: 14, frozen: 90, counter: 2 } },
-  { key: 'frozen',    label: 'Frozen',     emoji: '🧊', hue: 'frozen',    aisle: 5, defaultUnit: 'pkg', homeKind: 'frozen',  shelfLife: { frozen: 180, chilled: 3 } },
-  { key: 'grain',     label: 'Grains & pasta', emoji: '🍚', hue: 'grain', aisle: 6, defaultUnit: 'lb',  homeKind: 'pantry',  shelfLife: { pantry: 540, chilled: 7, frozen: 365 } },
-  { key: 'canned',    label: 'Canned & jarred', emoji: '🥫', hue: 'canned', aisle: 7, defaultUnit: 'can', homeKind: 'pantry', shelfLife: { pantry: 730, chilled: 5 } },
-  { key: 'condiment', label: 'Condiments', emoji: '🫙', hue: 'condiment', aisle: 8, defaultUnit: 'ea',  homeKind: 'chilled', shelfLife: { chilled: 180, pantry: 365 } },
-  { key: 'spice',     label: 'Spices & oils', emoji: '🧂', hue: 'spice',  aisle: 9, defaultUnit: 'ea',  homeKind: 'pantry',  shelfLife: { pantry: 730, counter: 365 } },
-  { key: 'snack',     label: 'Snacks',     emoji: '🍿', hue: 'snack',     aisle: 10, defaultUnit: 'pkg', homeKind: 'pantry', shelfLife: { pantry: 120, counter: 60 } },
-  { key: 'beverage',  label: 'Drinks',     emoji: '🧃', hue: 'beverage',  aisle: 11, defaultUnit: 'ea',  homeKind: 'chilled', shelfLife: { chilled: 30, pantry: 365 } },
-  { key: 'other',     label: 'Other',      emoji: '📦', hue: 'other',     aisle: 12, defaultUnit: 'ea',  homeKind: 'pantry',  shelfLife: { pantry: 180, chilled: 14, frozen: 180 } },
+  { key: 'produce',   label: 'Produce',    emoji: '🥬', hue: 'produce',   aisle: 1, homeKind: 'chilled', shelfLife: { chilled: 7, counter: 4, frozen: 240, pantry: 10 } },
+  { key: 'bakery',    label: 'Bakery',     emoji: '🥖', hue: 'bakery',    aisle: 2, homeKind: 'counter', shelfLife: { counter: 4, pantry: 5, chilled: 10, frozen: 90 } },
+  { key: 'protein',   label: 'Meat & fish', emoji: '🥩', hue: 'protein',  aisle: 3, homeKind: 'chilled', shelfLife: { chilled: 3, frozen: 180, pantry: 730 } },
+  { key: 'dairy',     label: 'Dairy & eggs', emoji: '🥛', hue: 'dairy',   aisle: 4, homeKind: 'chilled', shelfLife: { chilled: 14, frozen: 90, counter: 2 } },
+  { key: 'frozen',    label: 'Frozen',     emoji: '🧊', hue: 'frozen',    aisle: 5, homeKind: 'frozen',  shelfLife: { frozen: 180, chilled: 3 } },
+  { key: 'grain',     label: 'Grains & pasta', emoji: '🍚', hue: 'grain', aisle: 6, homeKind: 'pantry',  shelfLife: { pantry: 540, chilled: 7, frozen: 365 } },
+  { key: 'canned',    label: 'Canned & jarred', emoji: '🥫', hue: 'canned', aisle: 7, homeKind: 'pantry', shelfLife: { pantry: 730, chilled: 5 } },
+  { key: 'condiment', label: 'Condiments', emoji: '🫙', hue: 'condiment', aisle: 8, homeKind: 'chilled', shelfLife: { chilled: 180, pantry: 365 } },
+  { key: 'spice',     label: 'Spices & oils', emoji: '🧂', hue: 'spice',  aisle: 9, homeKind: 'pantry',  shelfLife: { pantry: 730, counter: 365 } },
+  { key: 'snack',     label: 'Snacks',     emoji: '🍿', hue: 'snack',     aisle: 10, homeKind: 'pantry', shelfLife: { pantry: 120, counter: 60 } },
+  { key: 'beverage',  label: 'Drinks',     emoji: '🧃', hue: 'beverage',  aisle: 11, homeKind: 'chilled', shelfLife: { chilled: 30, pantry: 365 } },
+  { key: 'other',     label: 'Other',      emoji: '📦', hue: 'other',     aisle: 12, homeKind: 'pantry',  shelfLife: { pantry: 180, chilled: 14, frozen: 180 } },
 ]
 
 const BY_KEY = new Map(CATEGORIES.map((c) => [c.key, c]))

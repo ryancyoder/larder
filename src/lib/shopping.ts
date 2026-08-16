@@ -2,6 +2,7 @@ import { db } from '../db/db'
 import type { ItemView, PlanEntry, Recipe, ShopItem, Unit, Category } from '../db/schema'
 import { bestMatch, isAssumedStaple, normalize, titleCase } from './match'
 import { convert } from './units'
+import { neededInItemUnits } from './suggest'
 import { guessCategory } from './categories'
 import { suggestPlace } from './locations'
 import { todayISO } from './dates'
@@ -70,7 +71,10 @@ export function generateList(
         continue
       }
 
-      const needed = ing.qty && ing.unit ? convert(ing.qty * scale, ing.unit, match.unit) : null
+      // Same pack-size-aware comparison the recipe screen uses, so the list and
+      // the coverage badge can never disagree.
+      const perServing = neededInItemUnits(ing, match)
+      const needed = perServing == null ? null : perServing * scale
       if (needed == null) continue // Have it; can't compare amounts, so assume enough.
       const short = needed - match.available
       if (short > 0.01) {
