@@ -1619,19 +1619,31 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
 .pos-flag.inset { left: 42px; }
 .pos-grid.large .pos-flag.inset { left: 46px; }
 
-/* Reserved: a slash straight across the tile. Held stock is stock you can see
-   but must not spend, and a corner badge was too easy to miss. */
+/* Reserved: an X across the whole tile, and the picture pulled back behind it.
+   Held stock is stock you can see but must not spend, so it should read as
+   crossed out rather than merely badged. */
 .pos-tile.reserved::before {
   content: '';
   position: absolute;
   inset: 0;
   z-index: 2;
   pointer-events: none;
-  background: linear-gradient(
-    to top right,
-    transparent calc(50% - 2px),
-    color-mix(in srgb, var(--danger) 82%, transparent) calc(50% - 2px),
-    color-mix(in srgb, var(--danger) 82%, transparent) calc(50% + 2px),
-    transparent calc(50% + 2px)
-  );
+  background:
+    linear-gradient(
+      to top right,
+      transparent calc(50% - 2px),
+      color-mix(in srgb, var(--danger) 82%, transparent) calc(50% - 2px),
+      color-mix(in srgb, var(--danger) 82%, transparent) calc(50% + 2px),
+      transparent calc(50% + 2px)
+    ),
+    linear-gradient(
+      to bottom right,
+      transparent calc(50% - 2px),
+      color-mix(in srgb, var(--danger) 82%, transparent) calc(50% - 2px),
+      color-mix(in srgb, var(--danger) 82%, transparent) calc(50% + 2px),
+      transparent calc(50% + 2px)
+    );
 }
+/* Under the X, so the mark stays the loudest thing on the tile. */
+.pos-tile.reserved .pos-fill,
+.pos-tile.reserved .pos-glyph { opacity: 0.4; }

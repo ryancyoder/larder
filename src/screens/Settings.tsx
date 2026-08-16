@@ -284,6 +284,33 @@ export default function Settings({ onClose }: { onClose: () => void }) {
         </div>
       </div>
 
+      <div className="card card-pad stack">
+        <div>
+          <div style={{ fontWeight: 650 }}>This build</div>
+          <p style={{ fontSize: 12.5, color: 'var(--text-mute)', marginTop: 4 }}>
+            Installed to the home screen, the app can hold on to an old version longer than you'd
+            expect. If something looks unchanged after an update, check this against the latest
+            build and reload.
+          </p>
+        </div>
+        <code style={{ fontSize: 12.5, color: 'var(--text-dim)' }}>{__BUILD_ID__}</code>
+        <button
+          className="btn ghost sm"
+          style={{ alignSelf: 'flex-start' }}
+          onClick={async () => {
+            // Belt and braces: no service worker today, but a cache entry or a
+            // held page would both survive a plain refresh.
+            if ('caches' in window) {
+              const keys = await caches.keys()
+              await Promise.all(keys.map((k) => caches.delete(k)))
+            }
+            location.reload()
+          }}
+        >
+          ↻ Reload the app
+        </button>
+      </div>
+
       <p style={{ fontSize: 11.5, color: 'var(--text-mute)', textAlign: 'center' }}>
         Larder · installable from your browser's share menu
       </p>

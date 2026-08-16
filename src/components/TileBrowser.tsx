@@ -18,7 +18,7 @@ import { Seg } from './ui'
  * being copied and left to drift apart.
  */
 
-export type Filter = 'all' | 'low' | 'expiring' | 'staples' | 'main' | MealSlot
+export type Filter = 'all' | 'low' | 'empty' | 'expiring' | 'staples' | 'main' | MealSlot
 export type Sort = 'name' | 'low' | 'expiring'
 type TileSize = 'regular' | 'large'
 
@@ -36,6 +36,7 @@ function readSize(): TileSize {
 const FILTERS: Array<{ value: Filter; label: string }> = [
   { value: 'all', label: 'All' },
   { value: 'low', label: 'Low' },
+  { value: 'empty', label: 'Run out' },
   { value: 'expiring', label: 'Expiring' },
   { value: 'staples', label: 'Staples' },
   { value: 'main', label: '🍽️ Mains' },
@@ -112,6 +113,7 @@ export default function TileBrowser({
     let out = placeKey === '__all__' ? items : items.filter((i) => i.location === placeKey)
 
     if (filter === 'low') out = out.filter(isLow)
+    if (filter === 'empty') out = out.filter((i) => i.qty <= 0)
     if (filter === 'expiring') out = out.filter(isExpiring)
     if (filter === 'staples') out = out.filter((i) => i.isStaple)
     if (filter === 'main') out = out.filter((i) => i.isMain)

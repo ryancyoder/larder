@@ -14,6 +14,12 @@ import KitchenTiles from './KitchenTiles'
 
 type Filter = 'all' | StorageLocation
 type MealFilter = 'any' | MealSlot | 'main'
+/**
+ * Everything ever tracked stays in the kitchen, including what's run out — so
+ * there has to be a way to ask for one or the other. "Run out" is the shopping
+ * question; "In stock" is the cooking one.
+ */
+type StockFilter = 'all' | 'in' | 'out'
 
 export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void }) {
   const items = useKitchen()
@@ -21,6 +27,7 @@ export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void
   const [filter, setFilter] = useState<Filter>('all')
   const [query, setQuery] = useState('')
   const [mealFilter, setMealFilter] = useState<MealFilter>('any')
+  const [stock, setStock] = useState<StockFilter>('all')
   const [adding, setAdding] = useState(false)
   const [tiling, setTiling] = useState(false)
   const [selecting, setSelecting] = useState(false)
@@ -34,26 +41,29 @@ export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void
     if (filter !== 'all') list = list.filter((i) => i.location === filter)
     if (mealFilter === 'main') list = list.filter((i) => i.isMain)
     else if (mealFilter !== 'any') list = list.filter((i) => i.meal === mealFilter)
+    if (stock === 'in') list = list.filter((i) => i.qty > 0)
+    else if (stock === 'out') list = list.filter((i) => i.qty <= 0)
     if (query.trim()) {
       const q = query.trim()
       list = list.filter((i) => i.name.toLowerCase().includes(q.toLowerCase()) || similarity(q, i.name) > 0.4)
     }
     return [...list].sort(sortByUrgency)
-  }, [items, filter, query, mealFilter])
+  }, [items, filter, query, mealFilter, stock])
 
   // Keep the open sheet in sync after an edit rather than showing stale numbers.
   const live = selected && items ? items.find((i) => i.id === selected.id) ?? null : null
 
   const urgent = items ? expiringSoon(items, 3) : []
+  const emptyCount = items ? items.filter((i) => i.qty <= 0).length : 0
   const atRisk = urgent.reduce((sum, i) => sum + unitPrice(i) * i.available, 0)
 
   const grouped = useMemo(() => {
-    if (filter !== 'all' || query.trim() || mealFilter !== 'any') return null
+    if (filter !== 'all' || query.trim() || mealFilter !== 'any' || stock !== 'all') return null
     return places.map((loc) => ({
       loc,
       items: visible.filter((i) => i.location === loc.key),
     })).filter((g) => g.items.length > 0)
-  }, [visible, filter, query, mealFilter, places])
+  }, [visible, filter, query, mealFilter, stock, places])
 
   const visibleIds = visible.map((i) => i.id!).filter((id) => id != null)
   const allPicked = visibleIds.length > 0 && visibleIds.every((id) => picked.has(id))
@@ -95,6 +105,7 @@ export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void
           <h1>Kitchen</h1>
           <div className="sub">
             {items.length} items tracked
+            {emptyCount > 0 && <> · <span style={{ color: 'var(--text-dim)' }}>{emptyCount} run out</span></>}
             {urgent.length > 0 && <> · <span style={{ color: 'var(--fresh-urgent)' }}>{urgent.length} need using</span></>}
           </div>
         </div>
@@ -174,6 +185,17 @@ export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void
               { value: 'any' as MealFilter, label: 'Any meal' },
               ...SLOTS.map((sl) => ({ value: sl.key as MealFilter, label: `${sl.emoji} ${sl.label}` })),
               { value: 'main' as MealFilter, label: '🍽️ Mains' },
+            ]}
+          />
+        </div>
+        <div style={{ marginTop: 8 }}>
+          <Seg
+            value={stock}
+            onChange={setStock}
+            options={[
+              { value: 'all' as StockFilter, label: 'All' },
+              { value: 'in' as StockFilter, label: 'In stock' },
+              { value: 'out' as StockFilter, label: `Run out${emptyCount ? ` (${emptyCount})` : ''}` },
             ]}
           />
         </div>
