@@ -16,16 +16,28 @@ import MealTags, { mainAllowedFor } from './MealTags'
 import BarcodeScanner from './BarcodeScanner'
 import { useToast } from '../app/toast'
 
-export default function AddItemSheet({ onClose }: { onClose: () => void }) {
+export default function AddItemSheet({
+  onClose, defaultLocation, defaultMeal,
+}: {
+  onClose: () => void
+  /**
+   * Carried in from the Kitchen's filters. Adding while looking at one shelf
+   * almost always means adding *to* that shelf, and the same for a meal.
+   */
+  defaultLocation?: StorageLocation
+  defaultMeal?: MealSlot
+}) {
   const toast = useToast()
   const places = usePlaces() ?? []
   const [name, setName] = useState('')
   const [touchedCategory, setTouchedCategory] = useState(false)
-  const [touchedLocation, setTouchedLocation] = useState(false)
+  // A filtered location counts as already chosen, so the name-based guess below
+  // can't quietly move the item to a different shelf as you type.
+  const [touchedLocation, setTouchedLocation] = useState(defaultLocation != null)
   const [touchedExpiry, setTouchedExpiry] = useState(false)
 
   const [categoryOverride, setCategoryOverride] = useState<Category>('other')
-  const [locationOverride, setLocationOverride] = useState<StorageLocation>('fridge')
+  const [locationOverride, setLocationOverride] = useState<StorageLocation>(defaultLocation ?? 'fridge')
   const [expiryOverride, setExpiryOverride] = useState('')
 
   const [qty, setQty] = useState('1')
@@ -34,7 +46,7 @@ export default function AddItemSheet({ onClose }: { onClose: () => void }) {
   const [size, setSize] = useState('')
   const [sizeUnit, setSizeUnit] = useState<Unit>('g')
   const [price, setPrice] = useState('')
-  const [meal, setMeal] = useState<MealSlot | undefined>()
+  const [meal, setMeal] = useState<MealSlot | undefined>(defaultMeal)
   const [isMain, setIsMain] = useState(false)
   const [converted, setConverted] = useState<string | null>(null)
   const [isStaple, setIsStaple] = useState(false)

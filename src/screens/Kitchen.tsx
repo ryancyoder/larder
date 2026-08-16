@@ -229,7 +229,16 @@ export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void
         />
       )}
 
-      {adding && <AddItemSheet onClose={() => setAdding(false)} />}
+      {adding && (
+        <AddItemSheet
+          onClose={() => setAdding(false)}
+          // Whatever the list is narrowed to is what you're most likely adding.
+          // 'main' is skipped: a main dish needs a meal, and the filter doesn't
+          // say which one.
+          defaultLocation={filter === 'all' ? undefined : filter}
+          defaultMeal={mealFilter === 'any' || mealFilter === 'main' ? undefined : mealFilter}
+        />
+      )}
       {live && <ItemSheet item={live} onClose={() => setSelected(null)} />}
     </>
   )
