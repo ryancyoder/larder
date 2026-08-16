@@ -82,6 +82,15 @@ export async function applyBulk(ids: number[], changes: BulkChanges): Promise<nu
   return touched
 }
 
+/**
+ * Starring one item from a tile. Routes through the bulk path so "becoming a
+ * staple" means exactly one thing — including the par level, without which a
+ * staple would never trigger a restock.
+ */
+export async function setStaple(id: number, isStaple: boolean): Promise<void> {
+  await applyBulk([id], { isStaple })
+}
+
 /** Deletes each row through the single-item path so holds and photos go too. */
 export async function deleteMany(ids: number[]): Promise<number> {
   let removed = 0

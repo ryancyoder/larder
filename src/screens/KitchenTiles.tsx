@@ -5,6 +5,7 @@ import { usePhoto } from '../app/usePhoto'
 import { categoryMeta } from '../lib/categories'
 import { freshnessOf } from '../lib/inventory'
 import { formatAmount } from '../lib/units'
+import { setStaple } from '../lib/bulk'
 import TileBrowser, { isLow } from '../components/TileBrowser'
 import ItemSheet from '../components/ItemSheet'
 import AddItemSheet from '../components/AddItemSheet'
@@ -104,6 +105,19 @@ function KitchenTile({ item, onOpen }: { item: ItemView; onOpen: () => void }) {
         <span className="pos-flag held">🔒</span>
       ) : null}
     </button>
+
+      {/* A sibling rather than a child: the tile is itself a button, and one
+          button cannot legally nest inside another. Same trick the quick-add
+          clear button uses. */}
+      <button
+        className={`pos-star${item.isStaple ? ' on' : ''}`}
+        aria-pressed={item.isStaple}
+        aria-label={item.isStaple ? `${item.name} is a staple — tap to unstar` : `Mark ${item.name} as a staple`}
+        title={item.isStaple ? 'A staple — restocks itself when low' : 'Mark as a staple'}
+        onClick={() => setStaple(item.id!, !item.isStaple)}
+      >
+        {item.isStaple ? '★' : '☆'}
+      </button>
     </div>
   )
 }

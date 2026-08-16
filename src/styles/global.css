@@ -1163,6 +1163,31 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
 }
 .pos-clear:active { transform: scale(0.9); }
 
+/* Staple toggle, like starring a favourite in a photo album. Always present so
+   it can be found, but hollow and quiet until it's on. */
+.pos-star {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 19px;
+  line-height: 1;
+  color: var(--text-mute);
+  /* Legible over a bright pack shot as well as a dark tile. */
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+  transition: transform 0.12s var(--ease), color 0.15s;
+}
+.pos-star:hover { color: var(--text-dim); }
+.pos-star.on { color: var(--warn); }
+.pos-star:active { transform: scale(0.82); }
+
+/* Keep the star clear of the two-line caption on a photo tile. */
+.pos-tile.has-photo ~ .pos-star { text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8); }
+
 .pos-empty {
   grid-column: 1 / -1;
   padding: 40px 20px;
