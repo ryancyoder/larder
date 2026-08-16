@@ -13,6 +13,31 @@
 /** MIT-licensed. The 512×512 lite build is the smallest permissive option. */
 const MODEL_ID = 'studioludens/birefnet-lite-512'
 
+/** Injected by Vite from the installed onnxruntime-web, so it can never drift. */
+declare const __ORT_VERSION__: string
+
+const ORT_BASE = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${__ORT_VERSION__}/dist`
+
+/**
+ * ONNX Runtime ships several WASM builds and they are not interchangeable.
+ * In this version `webgpuInit` is exported only by the `asyncify` and `jspi`
+ * glue — notably *not* by `jsep`, despite the name. Pinning the pair explicitly
+ * keeps a production bundle from resolving a mismatched artifact.
+ */
+const ORT_WASM = {
+  webgpu: {
+    mjs: `${ORT_BASE}/ort-wasm-simd-threaded.asyncify.mjs`,
+    wasm: `${ORT_BASE}/ort-wasm-simd-threaded.asyncify.wasm`,
+  },
+  wasm: {
+    mjs: `${ORT_BASE}/ort-wasm-simd-threaded.mjs`,
+    wasm: `${ORT_BASE}/ort-wasm-simd-threaded.wasm`,
+  },
+} as const
+
+/** fp16 is a WebGPU-only path here; the CPU backend needs full precision. */
+const DTYPE = { webgpu: 'fp16', wasm: 'fp32' } as const
+
 /** Roughly what the fp16 weights cost, for the confirmation prompt. */
 export const MODEL_DOWNLOAD_MB = 94
 
@@ -42,9 +67,8 @@ async function getModel(onProgress?: (p: CutoutProgress) => void): Promise<Loade
   if (loading) return loading
 
   loading = (async () => {
-    const { AutoModel, AutoProcessor } = await import('@huggingface/transformers')
+    const { AutoModel, AutoProcessor, env } = await import('@huggingface/transformers')
 
-    const device = webgpuAvailable() ? 'webgpu' : 'wasm'
     const progress_callback = (event: { status?: string; progress?: number }) => {
       if (event.status === 'progress' && typeof event.progress === 'number') {
         onProgress?.({ stage: 'downloading', ratio: Math.max(0, Math.min(1, event.progress / 100)) })
@@ -53,20 +77,41 @@ async function getModel(onProgress?: (p: CutoutProgress) => void): Promise<Loade
       }
     }
 
-    try {
+    // Multi-threaded WASM needs SharedArrayBuffer, which needs cross-origin
+    // isolation (COOP/COEP). GitHub Pages doesn't send those headers, so pin to
+    // one thread instead of letting it try and fail.
+    const wasmBackend = env.backends.onnx.wasm as unknown as {
+      wasmPaths: unknown
+      numThreads: number
+    }
+    wasmBackend.numThreads = 1
+
+    const attempt = async (device: 'webgpu' | 'wasm') => {
+      wasmBackend.wasmPaths = { ...ORT_WASM[device] }
       const [model, processor] = await Promise.all([
-        // fp16 halves the download. On WASM it may be unsupported, which is
-        // caught below rather than silently pulling the 183MB fp32 build.
-        AutoModel.from_pretrained(MODEL_ID, { dtype: 'fp16', device, progress_callback } as never),
+        AutoModel.from_pretrained(MODEL_ID, { dtype: DTYPE[device], device, progress_callback } as never),
         AutoProcessor.from_pretrained(MODEL_ID, { progress_callback } as never),
       ])
-      loaded = { model, processor }
+      return { model, processor }
+    }
+
+    try {
+      try {
+        if (webgpuAvailable()) {
+          loaded = await attempt('webgpu')
+          return loaded
+        }
+      } catch (gpuErr) {
+        // A WebGPU backend that won't initialise is common enough — on some
+        // Safari builds especially — that it must degrade rather than dead-end.
+        console.warn('[cutout] WebGPU backend unavailable, falling back to WASM:', gpuErr)
+      }
+
+      loaded = await attempt('wasm')
       return loaded
     } catch (err) {
       throw new CutoutError(
-        device === 'wasm'
-          ? "This browser couldn't load the cutout model. Safari and Chrome on a recent device handle it best."
-          : `The cutout model failed to load. ${(err as Error)?.message ?? ''}`.trim(),
+        `The cutout model could not start on this browser. ${(err as Error)?.message ?? ''}`.trim(),
       )
     } finally {
       loading = null
