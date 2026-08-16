@@ -59,6 +59,12 @@ export interface Photo {
   thumb: Blob | null
   remoteUrl?: string
   source: 'camera' | 'library' | 'openfoodfacts'
+  /**
+   * Background removed, so the blob is a WebP with an alpha channel. Display
+   * code must letterbox these (`contain`) rather than crop them (`cover`) —
+   * a cropped cutout looks like a rendering bug.
+   */
+  cutout?: boolean
   createdAt: string
   /** Credit line for photos that came from someone else. */
   attribution?: string

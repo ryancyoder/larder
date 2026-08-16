@@ -148,6 +148,34 @@ Items can carry a real picture. Three ways to get one:
 Pictures render inside the freshness ring on every list, so an item shows what it *is* and how
 long it has left in the same glance, and full-width at the top of the detail sheet.
 
+### Cutting out the background
+
+Any photo can have its background removed, on-device. Tap **✂️ Cut out background** under a
+photo; the result is previewed and the original is kept until you accept it.
+
+It runs [BiRefNet-lite](https://huggingface.co/studioludens/birefnet-lite-512) (MIT) through
+transformers.js — WebGPU where the browser has it, WASM otherwise. **The photo never leaves the
+device.** Only the model is downloaded, once, from the Hugging Face CDN.
+
+The honest costs:
+
+| | |
+|---|---|
+| First run | **~94 MB** model download, then cached. Settings shows it and can clear it. |
+| Every run | A few seconds. ~5s on desktop WebGPU; slower on an iPad. |
+| Bundle | transformers.js is a lazy 506 KB chunk — it never touches the main bundle. |
+| Output | Tiny. A 21 KB JPEG becomes a 19 KB WebP cutout, 6 KB at thumbnail size. |
+
+Two implementation notes that are easy to get wrong. Cutouts are stored as **WebP, not JPEG** —
+JPEG has no alpha channel, so the normal photo path would silently composite the cutout onto
+black with no error. And cutouts are flagged on the `Photo` record so display code can letterbox
+them (`contain`) instead of cropping them (`cover`); a cropped cutout looks like a rendering bug.
+
+It's deliberately opt-in rather than automatic: it's slow enough to interrupt a flow, and it
+fails on cluttered backgrounds. A jar on a counter cuts beautifully; a shelf photographed inside
+a packed fridge does not. Product shots from barcode scanning are already on white, so those cut
+out near-perfectly.
+
 **Storage.** Every image is downscaled and re-encoded to JPEG before it's saved — 1200px for the
 detail view, 200px for lists — which takes a 5 MB camera frame down to roughly 20–60 KB. Product
 shots fetched from Open Food Facts are re-encoded the same way, so they work offline afterwards;

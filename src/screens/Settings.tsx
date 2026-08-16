@@ -4,6 +4,7 @@ import { runSeed } from '../db/seed'
 import { Field, Seg, Sheet } from '../components/ui'
 import { useToast } from '../app/toast'
 import { formatBytes, photoStorageBytes } from '../lib/photos'
+import { MODEL_DOWNLOAD_MB, clearModelCache, modelIsCached } from '../lib/cutout'
 import { useLayout, type LayoutMode } from '../app/layout'
 import { kindLabel, movePlace } from '../lib/locations'
 import { usePlaces } from '../app/data'
@@ -20,6 +21,7 @@ export default function Settings({ onClose }: { onClose: () => void }) {
   const [key, setKey] = useState('')
   const [hasKey, setHasKey] = useState(false)
   const [photoBytes, setPhotoBytes] = useState<number | null>(null)
+  const [cutoutCached, setCutoutCached] = useState(false)
   const { mode, setMode, viewportSuggests } = useLayout()
   const places = usePlaces() ?? []
   const [editingPlace, setEditingPlace] = useState<StoragePlace | 'new' | null>(null)
@@ -27,6 +29,7 @@ export default function Settings({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     getSetting('anthropicKey').then((k) => setHasKey(Boolean(k)))
     photoStorageBytes().then(setPhotoBytes)
+    modelIsCached().then(setCutoutCached)
   }, [])
 
   function applyTheme(next: Theme) {
@@ -193,8 +196,23 @@ export default function Settings({ onClose }: { onClose: () => void }) {
             since they'd bloat the file.
           </p>
         </div>
+        {cutoutCached && (
+          <p style={{ fontSize: 12.5, color: 'var(--text-mute)' }}>
+            The background-removal model ({MODEL_DOWNLOAD_MB} MB) is cached on this device.
+            Clearing it frees the space; the next cutout re-downloads it.
+          </p>
+        )}
+
         <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
           <button className="btn sm" onClick={exportData}>⬇ Export JSON</button>
+          {cutoutCached && (
+            <button
+              className="btn ghost sm"
+              onClick={async () => { await clearModelCache(); setCutoutCached(false); toast('Cutout model removed') }}
+            >
+              Clear cutout model
+            </button>
+          )}
           <button
             className="btn ghost sm"
             onClick={async () => {

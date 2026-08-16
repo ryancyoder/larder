@@ -10,7 +10,7 @@ import { db } from '../db/db'
 import { relativeDays } from '../lib/dates'
 import { ExpiryChip, Field, FreshnessRing, Sheet } from './ui'
 import { useToast } from '../app/toast'
-import { usePhotoUrl } from '../app/usePhoto'
+import { usePhoto } from '../app/usePhoto'
 import { setItemPhoto } from '../lib/photos'
 import PhotoCapture from './PhotoCapture'
 import { db as database } from '../db/db'
@@ -28,7 +28,7 @@ export default function ItemSheet({ item, onClose }: { item: ItemView; onClose: 
   const fresh = freshnessOf(item)
   const perUnit = unitPrice(item)
   const places = usePlaces() ?? []
-  const hero = usePhotoUrl(item.photoId, 'full')
+  const { url: hero, cutout: heroCutout } = usePhoto(item.photoId, 'full')
   const credit = useLiveQuery(
     async () => (item.photoId == null ? undefined : (await database.photos.get(item.photoId))?.attribution),
     [item.photoId],
@@ -64,7 +64,7 @@ export default function ItemSheet({ item, onClose }: { item: ItemView; onClose: 
     <Sheet title={item.name} onClose={onClose}>
       {hero && (
         <div className="photo-hero">
-          <img src={hero} alt={item.name} />
+          <img src={hero} alt={item.name} className={heroCutout ? 'is-cutout' : undefined} />
           {credit && <span className="photo-credit">{credit}</span>}
         </div>
       )}

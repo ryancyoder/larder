@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ItemView, StoragePlace } from '../db/schema'
 import { useKitchen, usePlaces, useShopList } from '../app/data'
-import { usePhotoUrl } from '../app/usePhoto'
+import { usePhoto } from '../app/usePhoto'
 import { categoryMeta } from '../lib/categories'
 import { freshnessOf, sortByUrgency } from '../lib/inventory'
 import { formatAmount } from '../lib/units'
@@ -202,7 +202,7 @@ function PlaceTile({ place, items, onOpen }: { place: StoragePlace; items: ItemV
 }
 
 function ItemTile({ item, qty, list }: { item: ItemView; qty: number; list: Parameters<typeof shopQtyFor>[0] }) {
-  const photo = usePhotoUrl(item.photoId, 'thumb')
+  const { url: photo, cutout } = usePhoto(item.photoId, 'thumb')
   const meta = categoryMeta(item.category)
   const fresh = freshnessOf(item)
   const low = isLow(item)
@@ -210,12 +210,12 @@ function ItemTile({ item, qty, list }: { item: ItemView; qty: number; list: Para
   return (
     <div className="pos-tile-wrap">
       <button
-        className={`pos-tile${qty > 0 ? ' on' : ''}${photo ? ' has-photo' : ''}`}
+        className={`pos-tile${qty > 0 ? ' on' : ''}${photo ? ' has-photo' : ''}${cutout ? ' has-cutout' : ''}`}
         onClick={() => bumpShopLine(item, list)}
         aria-label={`Add ${item.name} to the shopping list`}
       >
         {photo
-          ? <img className="pos-fill" src={photo} alt="" loading="lazy" />
+          ? <img className={`pos-fill${cutout ? ' is-cutout' : ''}`} src={photo} alt="" loading="lazy" />
           : <span className="pos-glyph">{meta.emoji}</span>}
 
         {/* On a photo tile this becomes a scrimmed caption pinned to the bottom. */}

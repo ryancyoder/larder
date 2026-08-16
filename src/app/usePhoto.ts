@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { cachedPhotoUrl, loadPhotoUrl } from '../lib/photos'
+import { cachedPhotoIsCutout, cachedPhotoUrl, loadPhotoUrl } from '../lib/photos'
 
 /**
  * Resolves a stored photo to a renderable URL. Returns the cached URL
@@ -28,4 +28,15 @@ export function usePhotoUrl(photoId: number | undefined, size: 'thumb' | 'full' 
   }, [photoId, size])
 
   return url
+}
+
+/**
+ * URL plus whether it's a background-removed image. Callers that render the
+ * photo need both: a cutout must be letterboxed, never cropped.
+ */
+export function usePhoto(photoId: number | undefined, size: 'thumb' | 'full' = 'thumb') {
+  const url = usePhotoUrl(photoId, size)
+  // Populated by the same load, so it's correct by the time a URL exists.
+  const cutout = photoId != null && url ? cachedPhotoIsCutout(photoId) : false
+  return { url, cutout }
 }

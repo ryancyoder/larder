@@ -19,7 +19,7 @@ function fit(width: number, height: number, edge: number) {
   return { w: Math.round(width * scale), h: Math.round(height * scale) }
 }
 
-async function encode(bitmap: ImageBitmap, edge: number, quality: number): Promise<Blob> {
+async function encode(bitmap: ImageBitmap, edge: number, quality: number, mime: string): Promise<Blob> {
   const { w, h } = fit(bitmap.width, bitmap.height, edge)
   const canvas = document.createElement('canvas')
   canvas.width = w
@@ -28,19 +28,29 @@ async function encode(bitmap: ImageBitmap, edge: number, quality: number): Promi
   if (!ctx) throw new Error('Canvas is unavailable in this browser.')
   ctx.drawImage(bitmap, 0, 0, w, h)
   const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, 'image/jpeg', quality),
+    canvas.toBlob(resolve, mime, quality),
   )
   if (!blob) throw new Error('Could not encode the image.')
   return blob
 }
 
-/** Decodes, honours EXIF rotation, and re-encodes at both sizes. */
-export async function processImage(source: Blob): Promise<{ full: Blob; thumb: Blob }> {
+/**
+ * Decodes, honours EXIF rotation, and re-encodes at both sizes.
+ *
+ * `transparent` switches the output to WebP. JPEG has no alpha channel, so
+ * running a cutout through the default path would silently composite it onto
+ * black — the transparency would be gone with no error to notice.
+ */
+export async function processImage(
+  source: Blob,
+  transparent = false,
+): Promise<{ full: Blob; thumb: Blob }> {
+  const mime = transparent ? 'image/webp' : 'image/jpeg'
   const bitmap = await createImageBitmap(source, { imageOrientation: 'from-image' })
   try {
     const [full, thumb] = await Promise.all([
-      encode(bitmap, FULL_EDGE, FULL_QUALITY),
-      encode(bitmap, THUMB_EDGE, THUMB_QUALITY),
+      encode(bitmap, FULL_EDGE, FULL_QUALITY, mime),
+      encode(bitmap, THUMB_EDGE, THUMB_QUALITY, mime),
     ])
     return { full, thumb }
   } finally {
@@ -55,6 +65,16 @@ export async function savePhoto(
 ): Promise<number> {
   const { full, thumb } = await processImage(source)
   return db.photos.add({ full, thumb, source: origin, createdAt: todayISO(), attribution })
+}
+
+/** Stores a background-removed image, keeping its alpha channel intact. */
+export async function saveCutoutPhoto(
+  source: Blob,
+  origin: Photo['source'],
+  attribution?: string,
+): Promise<number> {
+  const { full, thumb } = await processImage(source, true)
+  return db.photos.add({ full, thumb, source: origin, cutout: true, createdAt: todayISO(), attribution })
 }
 
 /**
@@ -95,11 +115,17 @@ type Size = 'thumb' | 'full'
 
 const urlCache = new Map<string, string>()
 const pending = new Map<string, Promise<string | undefined>>()
+/** Whether each loaded photo is a cutout — display needs it alongside the URL. */
+const cutoutCache = new Map<number, boolean>()
 
 const keyOf = (photoId: number, size: Size) => `${photoId}:${size}`
 
 export function cachedPhotoUrl(photoId: number, size: Size): string | undefined {
   return urlCache.get(keyOf(photoId, size))
+}
+
+export function cachedPhotoIsCutout(photoId: number): boolean {
+  return cutoutCache.get(photoId) ?? false
 }
 
 export async function loadPhotoUrl(photoId: number, size: Size): Promise<string | undefined> {
@@ -113,6 +139,7 @@ export async function loadPhotoUrl(photoId: number, size: Size): Promise<string 
   const task = (async () => {
     const photo = await db.photos.get(photoId)
     if (!photo) return undefined
+    cutoutCache.set(photoId, Boolean(photo.cutout))
     const blob = size === 'thumb' ? photo.thumb ?? photo.full : photo.full ?? photo.thumb
     const url = blob ? URL.createObjectURL(blob) : photo.remoteUrl
     if (url) urlCache.set(key, url)
@@ -124,6 +151,7 @@ export async function loadPhotoUrl(photoId: number, size: Size): Promise<string 
 }
 
 function releaseCached(photoId: number) {
+  cutoutCache.delete(photoId)
   for (const size of ['thumb', 'full'] as Size[]) {
     const key = keyOf(photoId, size)
     const url = urlCache.get(key)

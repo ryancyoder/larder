@@ -4,7 +4,7 @@ import type { Category, ItemView } from '../db/schema'
 import { categoryMeta } from '../lib/categories'
 import { freshnessOf, type Freshness } from '../lib/inventory'
 import { relativeDays } from '../lib/dates'
-import { usePhotoUrl } from '../app/usePhoto'
+import { usePhoto } from '../app/usePhoto'
 
 export function Sheet({
   title, onClose, children, footer,
@@ -62,7 +62,7 @@ export function FreshnessRing({
 }) {
   const f = freshnessOf(item)
   const meta = categoryMeta(item.category)
-  const resolved = usePhotoUrl(item.photoId, big ? 'full' : 'thumb')
+  const { url: resolved, cutout } = usePhoto(item.photoId, big ? 'full' : 'thumb')
   const photo = showPhoto ? resolved : undefined
   const pct = f.state === 'stable' ? 100 : Math.max(4, f.remaining * 100)
   return (
@@ -72,7 +72,7 @@ export function FreshnessRing({
       title={item.expiresAt ? `Best before ${relativeDays(item.expiresAt)}` : 'No expiry tracked'}
     >
       {photo
-        ? <img className="ring-photo" src={photo} alt="" loading="lazy" />
+        ? <img className={`ring-photo${cutout ? ' is-cutout' : ''}`} src={photo} alt="" loading="lazy" />
         : <span className="glyph">{meta.emoji}</span>}
     </div>
   )

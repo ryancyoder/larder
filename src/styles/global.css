@@ -618,6 +618,27 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
 .ring.big { width: 56px; height: 56px; }
 .ring.big .glyph { font-size: 23px; }
 
+/* --------------------------------------------------------------------------
+   Cutouts. A background-removed image must be letterboxed, never cropped —
+   `cover` would slice the edges off a product floating in empty space, which
+   reads as a rendering bug rather than a style.
+   -------------------------------------------------------------------------- */
+
+.is-cutout {
+  object-fit: contain !important;
+  background: transparent !important;
+}
+.ring-photo.is-cutout { padding: 2px; }
+.photo-hero img.is-cutout { padding: 12px; }
+/* Edge-to-edge fill is for real photos; a cutout gets breathing room and lets
+   the tile's own surface show through behind it. */
+.pos-tile.has-cutout .pos-fill { padding: 14px 14px 34px; }
+.pos-tile.has-cutout .pos-label { background: none; }
+.pos-tile.has-cutout .pos-name,
+.pos-tile.has-cutout .pos-meta { text-shadow: none; }
+.pos-tile.has-cutout .pos-name { color: var(--text); }
+.pos-tile.has-cutout .pos-meta { color: var(--text-mute); }
+
 /* A real photo sits inside the ring, above the ::after mask. */
 .ring-photo {
   position: absolute;
