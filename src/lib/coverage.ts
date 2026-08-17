@@ -234,7 +234,8 @@ export async function recordMeal(
   item: ItemView | undefined,
   label?: string,
 ): Promise<void> {
-  const existing = await db.days.where('[date+slot]').equals([date, slot]).first()
+  const sameDay = await db.days.where('date').equals(date).toArray()
+  const existing = sameDay.find((d) => d.slot === slot)
   if (existing) await undoRecord(existing)
 
   if (item?.id != null) {

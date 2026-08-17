@@ -105,9 +105,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // One realtime channel for the session, so a change on the iPad reaches the
   // phone without either polling.
   useEffect(() => {
-    if (householdId == null) return
-    return watchRemoteChanges()
-  }, [householdId])
+    const token = session?.access_token
+    if (householdId == null || !token) return
+    return watchRemoteChanges(token)
+  }, [householdId, session?.access_token])
 
   const value: AuthState = {
     session,

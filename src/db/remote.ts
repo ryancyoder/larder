@@ -66,17 +66,38 @@ export function getVersion(): number {
   return version
 }
 
+/** Every table the app reads. Realtime needs each named explicitly. */
+const WATCHED = [
+  'items', 'reservations', 'recipes', 'plan_entries', 'meal_days', 'combos',
+  'shop_items', 'trips', 'ledger_events', 'settings', 'places', 'categories',
+  'people', 'photos',
+] as const
+
 /**
  * Realtime, so a change made on the iPad shows up on the phone.
  *
- * Local writes bump the counter themselves rather than waiting for the round
- * trip, so the device making a change never sees lag on its own edit.
+ * Two things this needs that are easy to miss, because getting either wrong
+ * fails silently — the channel reports SUBSCRIBED and then simply never
+ * delivers, which looks like the feature working until you check:
+ *
+ *   * The socket authorises separately from REST. Without `setAuth` it
+ *     connects as anon, and row-level security then filters out everything.
+ *   * A schema-wide filter is not enough; each table has to be named. The
+ *     tables also have to be in the `supabase_realtime` publication, which new
+ *     tables are not added to automatically.
+ *
+ * Local writes bump the counter directly rather than waiting for the round
+ * trip, so the device making a change never lags on its own edit.
  */
-export function watchRemoteChanges(): () => void {
-  const channel = supabase
-    .channel('larder-any-change')
-    .on('postgres_changes', { event: '*', schema: 'public' }, () => bump())
-    .subscribe()
+export function watchRemoteChanges(accessToken: string): () => void {
+  supabase.realtime.setAuth(accessToken)
+
+  let channel = supabase.channel('larder-changes')
+  for (const table of WATCHED) {
+    channel = channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => bump())
+  }
+  channel.subscribe()
+
   return () => { void supabase.removeChannel(channel) }
 }
 
@@ -123,13 +144,25 @@ const MAPS: Record<string, FieldMap> = {
   settings: {},
 }
 
-function toRow(table: string, obj: Record<string, unknown>): Record<string, unknown> {
+/**
+ * @param clearUndefined On an update, `undefined` means "clear this field" and
+ *   has to travel as an explicit null — IndexedDB deleted the key, but JSON
+ *   simply drops it, so the column would silently keep its old value. On an
+ *   insert it means the opposite: leave it out and let the column default
+ *   apply, because a null would override a `not null default false`.
+ */
+function toRow(
+  table: string,
+  obj: Record<string, unknown>,
+  clearUndefined = false,
+): Record<string, unknown> {
   const map = MAPS[table] ?? {}
   const out: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(obj)) {
     if (key === 'id') continue
+    if (value === undefined && !clearUndefined) continue
     // `order` is a reserved word, quoted in the schema and passed through as-is.
-    out[map[key] ?? key] = value
+    out[map[key] ?? key] = value === undefined ? null : value
   }
   return out
 }
@@ -201,7 +234,7 @@ class WhereClause<T> {
   async modify(patch: Partial<T>): Promise<void> {
     const { error } = await supabase
       .from(this.table)
-      .update(toRow(this.table, patch as Record<string, unknown>))
+      .update(toRow(this.table, patch as Record<string, unknown>, true))
       .eq('household_id', requireHousehold())
       .eq(this.column, this.value as never)
     if (error) throw error
@@ -264,7 +297,7 @@ class Table<T extends { id?: number }> {
   async update(id: number, patch: Partial<T>): Promise<void> {
     const { error } = await supabase
       .from(this.name)
-      .update(toRow(this.name, patch as Record<string, unknown>))
+      .update(toRow(this.name, patch as Record<string, unknown>, true))
       .eq('household_id', requireHousehold())
       .eq('id', id)
     if (error) throw error
