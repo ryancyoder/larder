@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import type { InboxItem } from '../db/schema'
 import { useCategories, useInbox, usePlaces } from '../app/data'
 import { usePhoto } from '../app/usePhoto'
-import { confirmInbox, discardInbox, importPhotos, rescan, updateInbox, type ImportProgress } from '../lib/inbox'
+import { confirmInbox, discardInbox, importPhotos, rescan, rescanAll, updateInbox, type ImportProgress } from '../lib/inbox'
 import { loadPhotoBlob } from '../lib/photos'
 import { identifyPhoto, AIError } from '../lib/ai'
 import { getSetting } from '../db/db'
@@ -27,6 +27,7 @@ export default function Unpack({ onClose }: { onClose: () => void }) {
 
   const [progress, setProgress] = useState<ImportProgress | null>(null)
   const [aiBusy, setAiBusy] = useState<{ done: number; total: number } | null>(null)
+  const [scanBusy, setScanBusy] = useState<ImportProgress | null>(null)
   const [error, setError] = useState('')
 
   const pending = rows ?? []
@@ -42,6 +43,18 @@ export default function Unpack({ onClose }: { onClose: () => void }) {
     } finally {
       setProgress(null)
       if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
+  /** Another look at every unnamed photo — free, and the scanner improves. */
+  async function scanAgain() {
+    setError('')
+    setScanBusy({ done: 0, total: unnamed.length })
+    try {
+      const found = await rescanAll(unnamed, setScanBusy)
+      toast(found ? `Read ${found} more barcode${found === 1 ? '' : 's'}` : 'No new barcodes in those photos')
+    } finally {
+      setScanBusy(null)
     }
   }
 
@@ -121,7 +134,12 @@ export default function Unpack({ onClose }: { onClose: () => void }) {
           {progress ? `Importing ${progress.done}/${progress.total}…` : '＋ Add photos'}
         </button>
         {unnamed.length > 0 && (
-          <button className="btn" disabled={!!aiBusy} onClick={runAI}>
+          <button className="btn" disabled={!!scanBusy || !!aiBusy} onClick={scanAgain}>
+            {scanBusy ? `Scanning ${scanBusy.done}/${scanBusy.total}…` : `🔎 Scan the ${unnamed.length} unknown`}
+          </button>
+        )}
+        {unnamed.length > 0 && (
+          <button className="btn" disabled={!!aiBusy || !!scanBusy} onClick={runAI}>
             {aiBusy ? `Naming ${aiBusy.done}/${aiBusy.total}…` : `✨ Name the ${unnamed.length} unknown`}
           </button>
         )}

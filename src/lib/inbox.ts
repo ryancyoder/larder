@@ -111,6 +111,27 @@ export async function rescan(row: InboxItem): Promise<boolean> {
   return true
 }
 
+/**
+ * Re-reads every photo still waiting for a name.
+ *
+ * The scanner has been wrong before — it spent a release never running at all
+ * on Safari — and a batch already imported under a broken reader is otherwise
+ * stuck being typed out by hand. Rescanning is free and local, so it is worth
+ * offering for the whole pile rather than one tile at a time.
+ */
+export async function rescanAll(
+  rows: InboxItem[],
+  onProgress?: (p: ImportProgress) => void,
+): Promise<number> {
+  const targets = rows.filter((r) => !r.name?.trim() && r.photoId != null)
+  let found = 0
+  for (const [index, row] of targets.entries()) {
+    if (await rescan(row).catch(() => false)) found++
+    onProgress?.({ done: index + 1, total: targets.length })
+  }
+  return found
+}
+
 export async function updateInbox(id: number, patch: Partial<InboxItem>): Promise<void> {
   await db.inbox.update(id, patch)
 }
