@@ -67,7 +67,7 @@ export const FOODS: Food[] = [
   { key: 'aubergine', name: 'Aubergine', icon: '🍆', group: 'veg', aka: ['eggplant', 'brinjal'] },
   { key: 'bamboo-shoot', name: 'Bamboo shoots', icon: '🥬', group: 'veg' },
   { key: 'beet', name: 'Beetroot', icon: '🫜', group: 'veg', aka: ['beet', 'beets', 'beetroot'] },
-  { key: 'bell-pepper', name: 'Bell pepper', icon: '🫑', group: 'veg', aka: ['capsicum', 'sweet pepper', 'red pepper', 'green pepper'] },
+  { key: 'bell-pepper', name: 'Bell pepper', icon: '🫑', group: 'veg', aka: ['capsicum', 'sweet pepper', 'red pepper', 'green pepper', 'peppers'] },
   { key: 'bok-choy', name: 'Bok choy', icon: '🥬', group: 'veg', aka: ['pak choi'] },
   { key: 'broccoli', name: 'Broccoli', icon: '🥦', group: 'veg', aka: ['broccolini'] },
   { key: 'brussels-sprout', name: 'Brussels sprouts', icon: '🥬', group: 'veg' },
@@ -264,7 +264,9 @@ export const FOODS: Food[] = [
   { key: 'allspice', name: 'Allspice', icon: '🌿', group: 'herb' },
   { key: 'basil', name: 'Basil', icon: '🌿', group: 'herb', aka: ['pesto'] },
   { key: 'bay-leaf', name: 'Bay leaves', icon: '🌿', group: 'herb' },
-  { key: 'black-pepper', name: 'Black pepper', icon: '🌿', group: 'herb', aka: ['peppercorns', 'ground pepper'] },
+  // "Pepper" on its own is the spice; "peppers" is the vegetable. Both are
+  // spelled out so neither has to win by the accident of a plural rule.
+  { key: 'black-pepper', name: 'Black pepper', icon: '🌿', group: 'herb', aka: ['peppercorns', 'ground pepper', 'pepper'] },
   { key: 'cardamom', name: 'Cardamom', icon: '🌿', group: 'herb' },
   { key: 'cayenne', name: 'Cayenne', icon: '🌶️', group: 'herb' },
   { key: 'chilli-powder', name: 'Chilli powder', icon: '🌶️', group: 'herb', aka: ['chili powder', 'red pepper flakes'] },
@@ -381,23 +383,53 @@ function normalise(text: string): string {
  * it wins outright rather than by luck of list order.
  */
 const TERMS: Array<{ term: string; key: string }> = (() => {
-  const out: Array<{ term: string; key: string }> = []
-  const seen = new Set<string>()
+  const all: Array<{ term: string; key: string; derived: boolean }> = []
   for (const food of FOODS) {
     for (const raw of [food.name, ...(food.aka ?? [])]) {
       const term = normalise(raw).trim()
       if (!term) continue
       // Both spellings, so "carrot" finds "Carrots" and "carrots" finds "Carrot".
-      const forms = [term, term.endsWith('s') ? term.slice(0, -1) : `${term}s`]
-      for (const form of forms) {
-        if (form.length < 3 || seen.has(form)) continue
-        seen.add(form)
-        out.push({ term: form, key: food.key })
-      }
+      const other = term.endsWith('s') ? term.slice(0, -1) : `${term}s`
+      if (term.length >= 3) all.push({ term, key: food.key, derived: false })
+      if (other.length >= 3) all.push({ term: other, key: food.key, derived: true })
     }
   }
-  return out.sort((a, b) => b.term.length - a.term.length)
+
+  // A word someone actually wrote down beats one a plural rule invented for it.
+  // Without this, "pepper" would belong to bell pepper purely because the
+  // vegetables are listed before the spices.
+  all.sort((a, b) => b.term.length - a.term.length || Number(a.derived) - Number(b.derived))
+
+  const seen = new Set<string>()
+  return all.filter(({ term }) => !seen.has(term) && seen.add(term))
+    .map(({ term, key }) => ({ term, key }))
 })()
+
+/**
+ * Words that mark what a thing *tastes of* rather than what it *is*.
+ *
+ * "Freeze-dried rice — chicken flavour" is rice. Left alone the plain
+ * longest-match rule files it under chicken, because chicken is the longer
+ * word, and the result is a bag of rice that never turns up when you ask what
+ * grains you have.
+ */
+const FLAVOUR_MARKERS = /\b(flavou?r|flavou?red|seasoning|seasoned|style)\b/i
+
+/**
+ * Drops the flavouring, keeps the food.
+ *
+ * Only whole segments are discarded — the part between dashes, commas or
+ * brackets — because that is how these labels are actually punctuated, and
+ * cutting on anything finer would start eating real words. If every segment
+ * looks like a flavour note, nothing is dropped: better to match on the whole
+ * name than on nothing.
+ */
+function withoutFlavourNotes(name: string): string {
+  const segments = name.split(/[-–—,()/|]+/).map((s) => s.trim()).filter(Boolean)
+  if (segments.length < 2) return name
+  const kept = segments.filter((s) => !FLAVOUR_MARKERS.test(s))
+  return kept.length ? kept.join(' ') : name
+}
 
 /**
  * The basic food a product name is an instance of, or undefined when nothing
@@ -408,7 +440,8 @@ const TERMS: Array<{ term: string; key: string }> = (() => {
  * entry for it, because a wrong food is invisible while a missing one is not.
  */
 export function matchFood(name: string, brand?: string): string | undefined {
-  const haystack = normalise(brand ? `${name} ${brand}` : name)
+  const subject = withoutFlavourNotes(name)
+  const haystack = normalise(brand ? `${subject} ${brand}` : subject)
   for (const { term, key } of TERMS) {
     if (haystack.includes(` ${term} `)) return key
   }
