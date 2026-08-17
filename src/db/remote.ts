@@ -114,6 +114,7 @@ type FieldMap = Record<string, string>
 
 const MAPS: Record<string, FieldMap> = {
   items: {
+    foodKey: 'food_key',
     photoId: 'photo_id', qtyInitial: 'qty_initial', sizeUnit: 'size_unit',
     purchasedAt: 'purchased_at', expiresAt: 'expires_at', openedAt: 'opened_at',
     isMain: 'is_main', isStaple: 'is_staple', parQty: 'par_qty', tripId: 'trip_id',

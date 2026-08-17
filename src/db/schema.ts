@@ -162,6 +162,17 @@ export interface Item {
   id?: number
   name: string
   category: Category
+  /**
+   * The basic food this is an instance of — a key into the food library, not a
+   * table. "Beets" for fresh beets, canned beets and freeze-dried beets alike,
+   * which is the whole point: the product is what you bought, the food is what
+   * it *is*, and only the second one answers "have we got any beets?".
+   *
+   * Optional because the library is finite and honest about it. A birthday cake
+   * is not a basic food, and filing it under wheat would be worse than leaving
+   * this unset.
+   */
+  foodKey?: string
   location: StorageLocation
   photoId?: number
   /** Product barcode, when the item was added by scanning one. */

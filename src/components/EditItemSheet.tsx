@@ -6,6 +6,7 @@ import { adjustQuantity } from '../lib/inventory'
 import { db } from '../db/db'
 import { useCategories, usePlaces } from '../app/data'
 import { titleCase } from '../lib/match'
+import { FOOD_GROUPS, foodsInGroup, matchFood } from '../lib/foods'
 import { Field, Sheet } from './ui'
 import MealTags, { mainAllowedFor } from './MealTags'
 import { useToast } from '../app/toast'
@@ -28,6 +29,9 @@ export default function EditItemSheet({ item, onClose }: { item: ItemView; onClo
   const [size, setSize] = useState(item.size != null ? String(item.size) : '')
   const [sizeUnit, setSizeUnit] = useState<Unit>(item.sizeUnit ?? 'g')
   const [category, setCategory] = useState<Category>(item.category)
+  // Falls back to a fresh match so an item added before the food library
+  // existed opens with the guess already made rather than blank.
+  const [foodKey, setFoodKey] = useState(item.foodKey ?? matchFood(item.name, item.brand) ?? '')
   const [location, setLocation] = useState<StorageLocation>(item.location)
   const [expiresAt, setExpiresAt] = useState(item.expiresAt ?? '')
   const [price, setPrice] = useState(item.price != null ? String(item.price) : '')
@@ -89,6 +93,7 @@ export default function EditItemSheet({ item, onClose }: { item: ItemView; onClo
       size: sizeValue,
       sizeUnit: sizeValue != null ? sizeUnit : undefined,
       category,
+      foodKey: foodKey || undefined,
       location,
       expiresAt: expiresAt || undefined,
       price: price.trim() ? Number(price) : undefined,
@@ -189,6 +194,24 @@ export default function EditItemSheet({ item, onClose }: { item: ItemView; onClo
           </select>
         </Field>
       </div>
+
+      {/*
+        What this *is*, as opposed to what it is. Filed automatically on the way
+        in; this is where a wrong guess gets corrected, and where the handful of
+        things the library has no word for can be left unfiled on purpose.
+      */}
+      <Field label="Basic food">
+        <select value={foodKey} onChange={(e) => setFoodKey(e.target.value)}>
+          <option value="">— not a basic food —</option>
+          {FOOD_GROUPS.map((g) => (
+            <optgroup key={g.key} label={`${g.icon} ${g.label}`}>
+              {foodsInGroup(g.key).map((f) => (
+                <option key={f.key} value={f.key}>{f.icon} {f.name}</option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+      </Field>
 
       <div className="grid-2">
         <Field label="Best before">

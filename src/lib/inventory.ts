@@ -1,6 +1,7 @@
 import { db } from '../db/db'
 import type { Item, ItemView, Reservation, StorageLocation } from '../db/schema'
 import { daysUntil, todayISO } from './dates'
+import { matchFood } from './foods'
 
 export type Freshness = 'expired' | 'urgent' | 'soon' | 'fresh' | 'stable'
 
@@ -209,7 +210,14 @@ export async function adjustQuantity(item: Item, newQty: number, reason?: string
 }
 
 export async function addItem(item: Omit<Item, 'id'>): Promise<number> {
-  const id = await db.items.add(item as Item)
+  // Filed against the food library on the way in, so browsing by food works
+  // without anyone being asked a question they didn't want at the till. An
+  // explicit key always wins — a correction must not be undone by the guesser.
+  const filed: Omit<Item, 'id'> = item.foodKey
+    ? item
+    : { ...item, foodKey: matchFood(item.name, item.brand) }
+
+  const id = await db.items.add(filed as Item)
   if (item.price) {
     await db.events.add({
       type: 'purchase',

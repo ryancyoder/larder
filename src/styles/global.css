@@ -1808,3 +1808,127 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
   text-align: center;
   line-height: 1.5;
 }
+
+/* ---------------------------------------------------------------------------
+   Foods — browsing by basic food rather than by product.
+
+   Icons, never photographs. A product tile earns its picture by being that
+   particular jar; a basic food is the abstraction over every jar, so a photo of
+   one carrot would quietly claim to be the carrot.
+   --------------------------------------------------------------------------- */
+
+.food-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 9px;
+  margin-top: 12px;
+}
+
+.food-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 13px 8px 11px;
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  text-align: center;
+  transition: transform 0.16s var(--ease), border-color 0.16s var(--ease);
+}
+
+.food-tile:active { transform: scale(0.97); }
+.food-tile:hover { border-color: var(--line-2); }
+
+/* Nothing on the shelf: still browsable, visibly not there. */
+.food-tile.bare { opacity: 0.5; }
+
+.food-icon { font-size: 30px; line-height: 1.1; }
+
+.food-name {
+  font-size: 12.5px;
+  font-weight: 620;
+  line-height: 1.25;
+  color: var(--text);
+}
+
+.food-sub { font-size: 11px; color: var(--text-mute); }
+
+.food-forms {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 3px;
+}
+
+.food-form {
+  padding: 1px 6px;
+  border-radius: 99px;
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.food-count {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 99px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 10px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+
+.food-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 4px;
+}
+
+.food-head-icon { font-size: 38px; line-height: 1; }
+
+.food-bucket {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  margin-bottom: 5px;
+}
+
+.food-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 9px 11px;
+  margin-bottom: 5px;
+  border-radius: var(--r-sm);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  text-align: left;
+}
+
+.food-row.bare { opacity: 0.55; }
+.food-row-name { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 600; }
+.food-row-meta { font-size: 11.5px; color: var(--text-mute); white-space: nowrap; }
+.food-row-qty {
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* A sixth tab has to fit a 375px phone; the wide layout has room to spare. */
+.nav button { min-width: 56px; }
+:root[data-layout='wide'] .nav button { min-width: 0; }
