@@ -159,32 +159,132 @@ export async function startScanner(
   }
 }
 
+/** The formats worth looking for on groceries, in both engines' vocabularies. */
+async function zxingHints() {
+  const { BarcodeFormat, DecodeHintType } = await import('@zxing/library')
+  const hints = new Map()
+  hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+    BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A,
+    BarcodeFormat.UPC_E, BarcodeFormat.CODE_128, BarcodeFormat.CODE_39, BarcodeFormat.ITF,
+  ])
+  // Real packaging is curved, creased and badly lit. Worth the extra passes.
+  hints.set(DecodeHintType.TRY_HARDER, true)
+  return hints
+}
+
+function plausible(value: string): boolean {
+  return /^\d{8,14}$/.test(value)
+}
+
+/**
+ * One attempt at framing the photo: how much of it to look at, and which way up.
+ *
+ * Whole frame first, then tighter centre crops — a photo of a jar is mostly jar,
+ * and cropping in gives the decoder a barcode that fills more of the frame.
+ *
+ * Each framing is tried twice, upright and turned a quarter turn. The 1D
+ * decoders read horizontal scan lines, so a barcode running down the side of an
+ * upright can is invisible to them until the picture is rotated. Photographing
+ * a tin standing on the counter produces exactly that, so it is not an edge
+ * case worth skipping.
+ */
+const PASSES: Array<{ crop: number; turn: boolean }> = [
+  { crop: 1, turn: false },
+  { crop: 1, turn: true },
+  { crop: 0.55, turn: false },
+  { crop: 0.55, turn: true },
+  { crop: 0.32, turn: false },
+  { crop: 0.32, turn: true },
+]
+
+/**
+ * A phone photo is around 4000px wide and decoding one at full size takes
+ * seconds — thirty of those is a coffee break. Barcode bars survive downscaling
+ * to roughly this far better than the wait survives a batch import, and the
+ * tighter crops hand the resolution back where it matters.
+ */
+const MAX_EDGE = 1600
+
+/** Renders one framing of the photo onto a canvas for a decoder to read. */
+function renderPass(bitmap: ImageBitmap, { crop, turn }: { crop: number; turn: boolean }): HTMLCanvasElement {
+  const sw = bitmap.width * crop
+  const sh = bitmap.height * crop
+  const sx = (bitmap.width - sw) / 2
+  const sy = (bitmap.height - sh) / 2
+
+  const scale = Math.min(1, MAX_EDGE / Math.max(sw, sh))
+  const dw = Math.max(1, Math.round(sw * scale))
+  const dh = Math.max(1, Math.round(sh * scale))
+
+  const canvas = document.createElement('canvas')
+  canvas.width = turn ? dh : dw
+  canvas.height = turn ? dw : dh
+
+  const ctx = canvas.getContext('2d')
+  if (ctx) {
+    if (turn) {
+      ctx.translate(canvas.width, 0)
+      ctx.rotate(Math.PI / 2)
+    }
+    ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, dw, dh)
+  }
+  return canvas
+}
+
 /**
  * Reads a barcode out of a still photo.
  *
  * Worth trying before anything cleverer: it runs on the device, costs nothing,
  * sends nothing anywhere, and when it works the answer is exact rather than a
- * guess at what the packet says. Most of a shopping trip is barcoded.
+ * guess at what the packet says.
  *
- * Returns undefined rather than throwing — a photo of an apple has no barcode,
- * and that is an ordinary outcome, not a failure.
+ * Both engines are used, for the same reason the live scanner uses both —
+ * Safari has no BarcodeDetector at all, and an iPad is the likeliest thing to
+ * be photographing a counter full of shopping. Getting this wrong meant the
+ * feature reported "no barcode found" on every photo without ever looking.
+ *
+ * Returns undefined rather than throwing: a photo of an apple has no barcode,
+ * and that is an ordinary outcome rather than a failure.
  */
 export async function readBarcodeFromImage(source: Blob): Promise<string | undefined> {
-  const Detector = nativeDetector()
-  if (!Detector) return undefined
-
   let bitmap: ImageBitmap | undefined
   try {
-    bitmap = await createImageBitmap(source)
-    const detector = new Detector()
-    const found = await detector.detect(bitmap)
-    // Longest wins: a stray short code is more likely a misread of packaging
-    // than a real EAN sitting next to one.
-    return found
-      .map((b) => b.rawValue)
-      .filter((v) => /^\d{8,14}$/.test(v))
-      .sort((a, b) => b.length - a.length)[0]
+    // A photo off an iPhone is usually stored landscape with an EXIF flag
+    // saying which way up it really is. Honour it, or every upright picture
+    // arrives on its side and the framing below rotates the wrong way.
+    bitmap = await createImageBitmap(source, { imageOrientation: 'from-image' })
+      .catch(() => createImageBitmap(source))
   } catch {
+    return undefined
+  }
+
+  try {
+    const Detector = nativeDetector()
+    if (Detector) {
+      const detector = new Detector({ formats: PRODUCT_FORMATS })
+      for (const pass of PASSES) {
+        try {
+          const found = await detector.detect(renderPass(bitmap, pass))
+          const value = found.map((b) => b.rawValue).filter(plausible)
+            .sort((a, b) => b.length - a.length)[0]
+          if (value) return value
+        } catch {
+          // Try the next framing rather than giving up on the photo.
+        }
+      }
+    }
+
+    // Safari and Firefox land here, as does anything the native pass missed.
+    const { BrowserMultiFormatReader } = await import('@zxing/browser')
+    const reader = new BrowserMultiFormatReader(await zxingHints())
+    for (const pass of PASSES) {
+      try {
+        const value = reader.decodeFromCanvas(renderPass(bitmap, pass))?.getText?.()
+        if (value && plausible(value)) return value
+      } catch {
+        // ZXing throws NotFoundException when there is simply no code here.
+      }
+    }
     return undefined
   } finally {
     bitmap?.close()
