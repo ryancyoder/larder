@@ -32,8 +32,16 @@ export default function SignIn() {
       if (mode === 'signUp') {
         const { error: err } = await supabase.auth.signUp({ email: email.trim(), password })
         if (err) throw err
-        // Confirmation is on for this project, so there is no session yet.
-        setNote(`Check ${email.trim()} for a confirmation link, then sign in.`)
+
+        // Supabase answers identically whether or not that address already has
+        // an account — deliberately, so this form can't be used to discover who
+        // is registered. There is no reliable signal to tell the two apart, so
+        // the honest thing is to describe both outcomes rather than assert the
+        // one that sends someone to wait for an email that will never arrive.
+        setNote(
+          `If ${email.trim()} is new, a confirmation link is on its way — click it, then sign in. ` +
+          'If it already has a kitchen, nothing was sent: just sign in below.',
+        )
         setMode('signIn')
       } else {
         const { error: err } = await supabase.auth.signInWithPassword({
@@ -44,7 +52,12 @@ export default function SignIn() {
         // The auth listener takes it from here.
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'That did not work.')
+      const message = err instanceof Error ? err.message : 'That did not work.'
+      setError(
+        /invalid login credentials/i.test(message)
+          ? 'That email and password do not match. Try again, or use the link below to get in without one.'
+          : message,
+      )
     } finally {
       setBusy(false)
     }
