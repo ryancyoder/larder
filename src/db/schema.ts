@@ -131,6 +131,32 @@ export interface Nutrition {
   fetchedAt: string
 }
 
+/**
+ * A photo waiting to become an item.
+ *
+ * Everything except the picture is a guess until someone confirms it, which is
+ * why this is its own table rather than a draft flag on Item: an unidentified
+ * photograph must never count towards dinner coverage or move a spend figure,
+ * and that guarantee shouldn't depend on every query remembering to exclude it.
+ */
+export interface InboxItem {
+  id?: number
+  photoId?: number
+  name?: string
+  brand?: string
+  barcode?: string
+  category?: Category
+  qty: number
+  unit: Unit
+  nutrition?: Nutrition
+  /** How the guess was arrived at, so the screen can say how far to trust it. */
+  guessSource?: 'barcode' | 'ai' | 'manual'
+  /** Why there is no guess — distinct from not having looked yet. */
+  guessNote?: string
+  scanned: boolean
+  createdAt: string
+}
+
 /** A physical thing in your kitchen. */
 export interface Item {
   id?: number

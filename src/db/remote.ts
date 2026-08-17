@@ -70,7 +70,7 @@ export function getVersion(): number {
 const WATCHED = [
   'items', 'reservations', 'recipes', 'plan_entries', 'meal_days', 'combos',
   'shop_items', 'trips', 'ledger_events', 'settings', 'places', 'categories',
-  'people', 'photos',
+  'people', 'photos', 'inbox_items',
 ] as const
 
 /**
@@ -141,6 +141,10 @@ const MAPS: Record<string, FieldMap> = {
     lastUsedAt: 'last_used_at',
   },
   people: {},
+  inbox_items: {
+    photoId: 'photo_id', guessSource: 'guess_source', guessNote: 'guess_note',
+    createdAt: 'created_at',
+  },
   settings: {},
 }
 

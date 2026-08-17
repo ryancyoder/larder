@@ -193,3 +193,111 @@ export function toRecipe(g: GeneratedRecipe): Omit<Recipe, 'id'> {
     timesCooked: 0,
   }
 }
+
+
+// ---------------------------------------------------------------------------
+// Naming a photograph
+//
+// The fallback for everything a barcode can't answer: loose produce, a bag of
+// apples, a packet photographed from the wrong side. Opt-in per batch, because
+// unlike every other part of this app it sends your pictures off the device and
+// costs money per photo.
+// ---------------------------------------------------------------------------
+
+const PHOTO_SCHEMA = {
+  type: 'object',
+  properties: {
+    name: { type: 'string', description: 'Plain grocery name, e.g. "Bananas", "Cheddar". Empty if unsure.' },
+    brand: { type: 'string' },
+    barcode: { type: 'string', description: 'Digits only, if legibly visible. Empty otherwise.' },
+    category: { type: 'string' },
+    confident: { type: 'boolean', description: 'False if this is a guess worth a human check.' },
+  },
+  required: ['name', 'confident'],
+  additionalProperties: false,
+} as const
+
+export interface PhotoGuess {
+  name: string
+  brand?: string
+  barcode?: string
+  category?: string
+  confident: boolean
+}
+
+/** Blob to the base64 the API wants, without the data-URL prefix. */
+async function toBase64(blob: Blob): Promise<string> {
+  const buffer = await blob.arrayBuffer()
+  let binary = ''
+  const bytes = new Uint8Array(buffer)
+  // Chunked: spreading a large array into String.fromCharCode blows the stack.
+  for (let i = 0; i < bytes.length; i += 8192) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 8192))
+  }
+  return btoa(binary)
+}
+
+export async function identifyPhoto(
+  apiKey: string,
+  image: Blob,
+  categories: string[],
+): Promise<PhotoGuess | null> {
+  if (!apiKey) throw new AIError('No API key set. Add one in Settings.')
+
+  const media = image.type && image.type.startsWith('image/') ? image.type : 'image/webp'
+
+  let res: Response
+  try {
+    res = await fetch(ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 1000,
+        output_config: { format: { type: 'json_schema', schema: PHOTO_SCHEMA } },
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: media, data: await toBase64(image) } },
+            {
+              type: 'text',
+              text: [
+                'This is one grocery item photographed at home while unpacking shopping.',
+                'Give it the short everyday name someone would write on a shopping list —',
+                '"Bananas", not "a bunch of ripe yellow bananas".',
+                'Read the brand and any barcode digits only if they are legible; do not invent them.',
+                `Pick the best category from: ${categories.join(', ')}.`,
+                'Set confident to false if the picture is unclear or it could plausibly be',
+                'more than one thing — a wrong name that looks certain is worse than an',
+                'honest blank, because nobody re-checks it.',
+              ].join(' '),
+            },
+          ],
+        }],
+      }),
+    })
+  } catch {
+    throw new AIError('Could not reach the API. Check your connection.')
+  }
+
+  if (!res.ok) {
+    if (res.status === 401) throw new AIError('That API key was rejected.')
+    if (res.status === 429) throw new AIError('Rate limited — try again in a moment.')
+    throw new AIError(`API error ${res.status}.`)
+  }
+
+  const data = await res.json()
+  const block = data?.content?.find((c: { type: string }) => c.type === 'text')
+  if (!block?.text) return null
+  try {
+    const guess = JSON.parse(block.text) as PhotoGuess
+    return guess.name?.trim() ? guess : null
+  } catch {
+    return null
+  }
+}

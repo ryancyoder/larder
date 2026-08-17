@@ -5,7 +5,7 @@ import { sortPlaces } from '../lib/locations'
 import { setCategoryRegistry, sortCategories } from '../lib/categories'
 import { sortPeople } from '../lib/people'
 import type {
-  Combo, ItemView, LedgerEvent, MealDay, Person, PlanEntry, Recipe, ShopItem, StorageCategory, StoragePlace, Trip,
+  Combo, InboxItem, ItemView, LedgerEvent, MealDay, Person, PlanEntry, Recipe, ShopItem, StorageCategory, StoragePlace, Trip,
 } from '../db/schema'
 
 /** Live views over IndexedDB. Every screen reads through these, never the tables directly. */
@@ -49,6 +49,14 @@ export function useCombos(): Combo[] | undefined {
 /** The household, in the user's chosen order. */
 export function usePeople(): Person[] | undefined {
   return useLiveQuery(async () => sortPeople(await db.people.toArray()), [])
+}
+
+/** Photos imported but not yet turned into items. */
+export function useInbox(): InboxItem[] | undefined {
+  return useLiveQuery(async () => {
+    const rows = await db.inbox.toArray()
+    return rows.sort((a, b) => (a.id ?? 0) - (b.id ?? 0))
+  }, [])
 }
 
 export function useShopList(): ShopItem[] | undefined {

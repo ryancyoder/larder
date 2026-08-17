@@ -2,7 +2,7 @@ import { supabase } from '../lib/supabase'
 import { Table, bump, getHouseholdId } from './remote'
 import type {
   Item, Reservation, Recipe, PlanEntry, ShopItem, Trip, LedgerEvent, Photo, StoragePlace,
-  StorageCategory, MealDay, Combo, Person, Setting,
+  StorageCategory, MealDay, Combo, Person, Setting, InboxItem,
 } from './schema'
 
 /**
@@ -31,6 +31,7 @@ class LarderDB {
   // A day has one dinner, so writing a second replaces the first.
   days = new Table<MealDay>('meal_days', 'household_id,date,slot')
   people = new Table<Person>('people')
+  inbox = new Table<InboxItem>('inbox_items')
   settings = new SettingsTable()
 
   /**

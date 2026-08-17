@@ -159,6 +159,38 @@ export async function startScanner(
   }
 }
 
+/**
+ * Reads a barcode out of a still photo.
+ *
+ * Worth trying before anything cleverer: it runs on the device, costs nothing,
+ * sends nothing anywhere, and when it works the answer is exact rather than a
+ * guess at what the packet says. Most of a shopping trip is barcoded.
+ *
+ * Returns undefined rather than throwing — a photo of an apple has no barcode,
+ * and that is an ordinary outcome, not a failure.
+ */
+export async function readBarcodeFromImage(source: Blob): Promise<string | undefined> {
+  const Detector = nativeDetector()
+  if (!Detector) return undefined
+
+  let bitmap: ImageBitmap | undefined
+  try {
+    bitmap = await createImageBitmap(source)
+    const detector = new Detector()
+    const found = await detector.detect(bitmap)
+    // Longest wins: a stray short code is more likely a misread of packaging
+    // than a real EAN sitting next to one.
+    return found
+      .map((b) => b.rawValue)
+      .filter((v) => /^\d{8,14}$/.test(v))
+      .sort((a, b) => b.length - a.length)[0]
+  } catch {
+    return undefined
+  } finally {
+    bitmap?.close()
+  }
+}
+
 export function scanningAvailable(): boolean {
   return Boolean(window.isSecureContext && navigator.mediaDevices?.getUserMedia)
 }

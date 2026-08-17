@@ -12,6 +12,7 @@ import AddItemSheet from '../components/AddItemSheet'
 import ItemSheet from '../components/ItemSheet'
 import BulkEditSheet from '../components/BulkEditSheet'
 import KitchenTiles from './KitchenTiles'
+import Unpack from './Unpack'
 
 type Filter = 'all' | StorageLocation
 type MealFilter = 'any' | MealSlot | 'main'
@@ -35,6 +36,7 @@ export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void
   const [held, setHeld] = useState<HoldFilter>('any')
   const [adding, setAdding] = useState(false)
   const [tiling, setTiling] = useState(false)
+  const [unpacking, setUnpacking] = useState(false)
   const [selecting, setSelecting] = useState(false)
   const [picked, setPicked] = useState<Set<number>>(new Set())
   const [bulkOpen, setBulkOpen] = useState(false)
@@ -119,7 +121,10 @@ export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void
         </div>
         <div className="row" style={{ gap: 6 }}>
           {!selecting && (
-            <button className="btn sm" onClick={() => setTiling(true)}>▦ Tiles</button>
+            <>
+              <button className="btn sm" onClick={() => setUnpacking(true)}>📷 Unpack</button>
+              <button className="btn sm" onClick={() => setTiling(true)}>▦ Tiles</button>
+            </>
           )}
           <button className="btn ghost sm" onClick={toggleSelecting}>
             {selecting ? 'Done' : 'Select'}
@@ -287,6 +292,7 @@ export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void
       )}
       {live && <ItemSheet item={live} onClose={() => setSelected(null)} />}
       {tiling && <KitchenTiles onClose={() => setTiling(false)} />}
+      {unpacking && <Unpack onClose={() => setUnpacking(false)} />}
     </>
   )
 }
