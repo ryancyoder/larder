@@ -4,12 +4,14 @@ import { supabase } from '../lib/supabase'
 /**
  * The way into the kitchen.
  *
- * Password is the primary route because a household signs in on several
- * devices and a password works without reaching for an inbox each time. The
- * magic link sits underneath as the way back in when the password is gone —
- * worth having, but not worth depending on, since Supabase rate-limits its
- * built-in email on the free tier and being locked out of your own food for an
- * hour is a poor failure mode.
+ * Google is the primary route: it is one tap, there is no password for the
+ * household to forget or share, and it is the same sign-in the other family
+ * apps use — the same Supabase project, so an account carries across.
+ *
+ * Email and password stay underneath rather than being removed. Accounts
+ * created before Google existed still use them, and a fallback matters when
+ * the whole household is locked out of the food otherwise. The magic link sits
+ * below that again, for when the password is gone.
  */
 
 type Mode = 'signIn' | 'signUp'
@@ -63,6 +65,26 @@ export default function SignIn() {
     }
   }
 
+  async function google() {
+    setBusy(true)
+    setError('')
+    setNote('')
+    try {
+      const { error: err } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        // Back to this build, wherever it is served from — the app runs at a
+        // repo subpath on Pages and at the root elsewhere.
+        options: { redirectTo: window.location.origin + window.location.pathname },
+      })
+      if (err) throw err
+      // The browser leaves for Google here; the auth listener picks it up on
+      // the way back.
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not start Google sign-in.')
+      setBusy(false)
+    }
+  }
+
   async function emailLink() {
     if (!email.includes('@')) {
       setError('Enter your email address first.')
@@ -94,9 +116,15 @@ export default function SignIn() {
         </h1>
         <p className="gate-sub">
           {mode === 'signIn'
-            ? 'One login for the household, shared across every device.'
+            ? 'One kitchen for the household, shared across every device.'
             : 'One account for the house. Everyone signs in with the same details.'}
         </p>
+
+        <button className="btn primary block" disabled={busy} onClick={google}>
+          {busy ? 'Working…' : 'Continue with Google'}
+        </button>
+
+        <div className="gate-or"><span>or use an email and password</span></div>
 
         <label className="field">
           <span>Email</span>
@@ -126,7 +154,7 @@ export default function SignIn() {
         {error && <p className="gate-error">{error}</p>}
         {note && <p className="gate-note">{note}</p>}
 
-        <button className="btn primary block" disabled={!canSubmit || busy} onClick={submit}>
+        <button className="btn block" disabled={!canSubmit || busy} onClick={submit}>
           {busy ? 'Working…' : mode === 'signIn' ? 'Sign in' : 'Create the kitchen'}
         </button>
 

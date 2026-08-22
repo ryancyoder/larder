@@ -1808,6 +1808,22 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
   text-align: center;
   line-height: 1.5;
 }
+/* Separates the one-tap Google route from the email fallback beneath it. */
+.gate-or {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11.5px;
+  color: var(--text-mute);
+  margin: 2px 0;
+}
+.gate-or::before,
+.gate-or::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line, rgba(128, 128, 128, 0.25));
+}
 
 /* ---------------------------------------------------------------------------
    Foods — browsing by basic food rather than by product.
