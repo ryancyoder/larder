@@ -2,12 +2,12 @@ import { useMemo, useState } from 'react'
 import type { ItemView, MealSlot, Person, StorageLocation } from '../db/schema'
 import { useKitchen, usePeople, usePlaces } from '../app/data'
 import { categoryMeta } from '../lib/categories'
-import { expiringSoon, freshnessOf, sortByUrgency, unitPrice } from '../lib/inventory'
+import { expiringSoon, sortByUrgency } from '../lib/inventory'
 import { formatAmount } from '../lib/units'
 import { similarity } from '../lib/match'
 import { SLOTS } from '../lib/plan'
 import { personLabel } from '../lib/people'
-import { CatDot, Empty, ExpiryChip, FreshnessRing, Section, Seg } from '../components/ui'
+import { CatDot, Empty, ExpiryChip, Section, Seg } from '../components/ui'
 import AddItemSheet from '../components/AddItemSheet'
 import ItemSheet from '../components/ItemSheet'
 import BulkEditSheet from '../components/BulkEditSheet'
@@ -65,7 +65,6 @@ export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void
   const urgent = items ? expiringSoon(items, 3) : []
   const emptyCount = items ? items.filter((i) => i.qty <= 0).length : 0
   const heldCount = items ? items.filter((i) => i.reserved > 0).length : 0
-  const atRisk = urgent.reduce((sum, i) => sum + unitPrice(i) * i.available, 0)
 
   const grouped = useMemo(() => {
     if (filter !== 'all' || query.trim() || mealFilter !== 'any' || stock !== 'all' || held !== 'any') return null
@@ -132,43 +131,6 @@ export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void
           {!selecting && <button className="btn ghost sm" onClick={onOpenSettings}>Settings</button>}
         </div>
       </div>
-
-      {urgent.length > 0 && !selecting && (
-        <Section
-          title="Eat me first"
-          hint={atRisk > 0 ? `$${atRisk.toFixed(2)} at risk` : undefined}
-        >
-          <div className="scroll-x">
-            {urgent.map((item) => {
-              const f = freshnessOf(item)
-              return (
-                <button
-                  key={item.id}
-                  className="card card-pad"
-                  style={{
-                    width: 148, textAlign: 'left', animation: 'fadeUp .34s var(--ease) both',
-                    display: 'flex', flexDirection: 'column',
-                  }}
-                  onClick={() => setSelected(item)}
-                >
-                  <FreshnessRing item={item} />
-                  <div style={{ fontWeight: 650, marginTop: 10, fontSize: 14, lineHeight: 1.25 }}>{item.name}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-mute)', marginTop: 3 }}>
-                    {formatAmount(item.available, item.unit)} free
-                  </div>
-                  {/* Pushes the countdown chip to a common baseline across cards. */}
-                  <div style={{ marginTop: 'auto', paddingTop: 10 }}>
-                    <span className={`chip tone-${f.state}`}>
-                      <span className="dot" />
-                      {f.state === 'expired' ? 'Past date' : f.days === 0 ? 'Today' : f.days === 1 ? 'Tomorrow' : `${f.days} days`}
-                    </span>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-        </Section>
-      )}
 
       <section className="section">
         <div className="row" style={{ marginBottom: 11, gap: 9 }}>
@@ -250,16 +212,12 @@ export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void
       ) : grouped ? (
         grouped.map((g) => (
           <Section key={g.loc.key} title={`${g.loc.emoji} ${g.loc.label}`} hint={g.loc.blurb}>
-            <div className="stack auto-cols">
-              {g.items.map((item, i) => <ItemRow key={item.id} item={item} index={i} people={people} selecting={selecting} picked={picked.has(item.id!)} onClick={() => open(item)} />)}
-            </div>
+            <ItemTable items={g.items} people={people} selecting={selecting} picked={picked} onOpen={open} />
           </Section>
         ))
       ) : (
         <div className="section">
-          <div className="stack auto-cols">
-            {visible.map((item, i) => <ItemRow key={item.id} item={item} index={i} people={people} selecting={selecting} picked={picked.has(item.id!)} onClick={() => open(item)} />)}
-          </div>
+          <ItemTable items={visible} people={people} selecting={selecting} picked={picked} onOpen={open} />
         </div>
       )}
 
@@ -307,51 +265,93 @@ function heldFor(item: ItemView, people: Person[]): string {
   return `${names.length} people`
 }
 
-function ItemRow({ item, index, people, onClick, selecting, picked }: {
+/**
+ * One line of the kitchen table.
+ *
+ * A table rather than cards: the point of this screen is scanning a shelf's
+ * worth of stock, and aligned columns are read down far faster than repeated
+ * blocks of prose. The narrow columns collapse on a phone, where only the name,
+ * the date and the amount fit — those being the three you actually scan for.
+ */
+function ItemRow({ item, people, onClick, selecting, picked }: {
   item: ItemView
-  index: number
   people: Person[]
   onClick: () => void
   selecting?: boolean
   picked?: boolean
 }) {
   const meta = categoryMeta(item.category)
+  const low = item.isStaple && item.available < (item.parQty ?? 0)
   return (
-    <button
-      className={`item${item.reserved > 0 ? ' held' : ''}${picked ? ' picked' : ''}${item.qty <= 0 ? ' spent' : ''}`}
+    <tr
+      className={`krow${item.reserved > 0 ? ' held' : ''}${picked ? ' picked' : ''}${item.qty <= 0 ? ' spent' : ''}`}
       onClick={onClick}
-      aria-pressed={selecting ? Boolean(picked) : undefined}
-      style={{ animationDelay: `${Math.min(index, 10) * 22}ms` }}
+      aria-selected={selecting ? Boolean(picked) : undefined}
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } }}
     >
       {selecting && (
-        <span className={`pick-box${picked ? ' on' : ''}`} aria-hidden>{picked ? '✓' : ''}</span>
+        <td className="k-pick">
+          <span className={`pick-box${picked ? ' on' : ''}`} aria-hidden>{picked ? '✓' : ''}</span>
+        </td>
       )}
-      <FreshnessRing item={item} />
-      <div style={{ minWidth: 0, flex: 1 }}>
-        <div className="name">{item.name}</div>
-        <div className="meta">
-          <CatDot category={item.category} />
-          <span>{meta.label}</span>
-          <ExpiryChip item={item} />
-          {item.reserved > 0 && (
-            <span className="chip tone-hold">
-              <span className="dot" />
-              {formatAmount(item.reserved, item.unit)} for {heldFor(item, people)}
-            </span>
-          )}
-          {item.isMain && <span className="chip"><span className="dot" style={{ background: 'var(--warn)' }} />main</span>}
-          {item.size && item.sizeUnit && (
-            <span>· {formatAmount(item.size, item.sizeUnit)} each</span>
-          )}
-          {item.isStaple && item.available < (item.parQty ?? 0) && (
-            <span className="chip tone-urgent"><span className="dot" />running low</span>
-          )}
-        </div>
-      </div>
-      <div className="qty">
+      <td className="k-name">
+        <span className="nm">{item.name}</span>
+        {item.reserved > 0 && (
+          <span className="chip tone-hold">
+            <span className="dot" />
+            {formatAmount(item.reserved, item.unit)} for {heldFor(item, people)}
+          </span>
+        )}
+        {low && <span className="chip tone-urgent"><span className="dot" />low</span>}
+        {item.isMain && <span className="chip"><span className="dot" style={{ background: 'var(--warn)' }} />main</span>}
+      </td>
+      <td className="k-cat">
+        <CatDot category={item.category} />
+        <span>{meta.label}</span>
+      </td>
+      <td className="k-when"><ExpiryChip item={item} /></td>
+      <td className="k-qty">
         {formatAmount(item.available, item.unit)}
         {item.reserved > 0 && <small>of {formatAmount(item.qty, item.unit)}</small>}
-      </div>
-    </button>
+      </td>
+    </tr>
+  )
+}
+
+/** The table shell, so the grouped and ungrouped lists stay identical. */
+function ItemTable({ items, people, selecting, picked, onOpen }: {
+  items: ItemView[]
+  people: Person[]
+  selecting: boolean
+  picked: Set<number>
+  onOpen: (item: ItemView) => void
+}) {
+  return (
+    <div className="ktable-wrap">
+      <table className="ktable">
+        <thead>
+          <tr>
+            {selecting && <th className="k-pick" aria-label="Selected" />}
+            <th className="k-name">Item</th>
+            <th className="k-cat">Category</th>
+            <th className="k-when">Use by</th>
+            <th className="k-qty">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item) => (
+            <ItemRow
+              key={item.id}
+              item={item}
+              people={people}
+              selecting={selecting}
+              picked={picked.has(item.id!)}
+              onClick={() => onOpen(item)}
+            />
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
