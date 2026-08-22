@@ -10,6 +10,7 @@ import { kindLabel, movePlace } from '../lib/locations'
 import { moveCategory } from '../lib/categories'
 import { movePerson } from '../lib/people'
 import { useCategories, usePeople, usePlaces } from '../app/data'
+import { useAuth } from '../app/auth'
 import PlaceEditor from '../components/PlaceEditor'
 import CategoryEditor from '../components/CategoryEditor'
 import PersonEditor from '../components/PersonEditor'
@@ -20,6 +21,7 @@ type Theme = 'dark' | 'light'
 
 export default function Settings({ onClose }: { onClose: () => void }) {
   const toast = useToast()
+  const { session, signOut } = useAuth()
   const [theme, setTheme] = useState<Theme>(
     () => (document.documentElement.dataset.theme as Theme) || 'dark',
   )
@@ -326,6 +328,29 @@ export default function Settings({ onClose }: { onClose: () => void }) {
             Restore defaults
           </button>
         </div>
+      </div>
+
+      <div className="card card-pad stack">
+        <div>
+          <div style={{ fontWeight: 650 }}>Account</div>
+          <p style={{ fontSize: 12.5, color: 'var(--text-mute)', marginTop: 4 }}>
+            {session?.user?.email
+              ? `Signed in as ${session.user.email}.`
+              : 'Signed in.'}{' '}
+            The kitchen lives on the server, so signing out here doesn’t remove
+            anything — you or anyone else in the household can sign back in.
+          </p>
+        </div>
+        <button
+          className="btn ghost sm"
+          style={{ alignSelf: 'flex-start' }}
+          onClick={async () => {
+            await signOut()
+            onClose()
+          }}
+        >
+          Sign out
+        </button>
       </div>
 
       <div className="card card-pad stack">
