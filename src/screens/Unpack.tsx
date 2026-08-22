@@ -1,9 +1,11 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { InboxItem } from '../db/schema'
 import { useCategories, useInbox, usePlaces } from '../app/data'
 import { usePhoto } from '../app/usePhoto'
-import { confirmInbox, discardInbox, importPhotos, rescan, rescanAll, updateInbox, type ImportProgress } from '../lib/inbox'
+import { applyBarcode, confirmInbox, discardInbox, importPhotos, rescan, rescanAll, updateInbox, type ImportProgress } from '../lib/inbox'
+import { scanningAvailable } from '../lib/barcode'
+import BarcodeScanner from '../components/BarcodeScanner'
 import { loadPhotoBlob } from '../lib/photos'
 import { identifyPhoto, AIError } from '../lib/ai'
 import { getSetting } from '../db/db'
@@ -209,8 +211,29 @@ function UnpackTile({
   const [open, setOpen] = useState(false)
   const [name, setName] = useState(row.name ?? '')
   const [busy, setBusy] = useState(false)
+  const [scanning, setScanning] = useState(false)
+  // Set once you type, so a scan that lands afterwards can't overwrite you.
+  const [typed, setTyped] = useState(false)
+
+  // A scan names the row underneath this field, so follow it — unless the
+  // name in the box is yours.
+  useEffect(() => {
+    if (!typed && row.name) setName(row.name)
+  }, [row.name, typed])
 
   const named = Boolean(row.name?.trim())
+
+  async function onScanned(code: string) {
+    setScanning(false)
+    setBusy(true)
+    try {
+      const { ok, name: found } = await applyBarcode(row, code)
+      if (found && !typed) setName(found)
+      onToast(ok ? `Found ${found}` : 'Barcode saved — not in Open Food Facts, so name it yourself')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   async function save() {
     setBusy(true)
@@ -266,10 +289,16 @@ function UnpackTile({
                 value={name}
                 autoFocus
                 placeholder="Bananas"
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => { setTyped(true); setName(e.target.value) }}
                 onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) save() }}
               />
             </label>
+
+            {scanningAvailable() && (
+              <button className="btn block" disabled={busy} onClick={() => setScanning(true)}>
+                📷 Scan the barcode
+              </button>
+            )}
 
             <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
               <button
@@ -282,7 +311,7 @@ function UnpackTile({
                   onToast(ok ? 'Barcode found' : 'Still no barcode in that photo')
                 }}
               >
-                🔎 Try the barcode again
+                🔎 Re-read this photo
               </button>
               <span className="spacer" />
               <button
@@ -304,6 +333,10 @@ function UnpackTile({
             </p>
           </div>
         </div>
+      )}
+
+      {scanning && (
+        <BarcodeScanner onDetected={onScanned} onClose={() => setScanning(false)} />
       )}
     </>
   )

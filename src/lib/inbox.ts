@@ -112,6 +112,44 @@ export async function rescan(row: InboxItem): Promise<boolean> {
 }
 
 /**
+ * Applies a barcode read off the product itself, rather than out of the photo.
+ *
+ * `rescan` can only re-examine pixels that were already captured, so when the
+ * barcode was never in frame — round the side of the packet, or under a thumb —
+ * re-running it forever returns the same nothing. Scanning the item in your
+ * hand is the way out of that.
+ *
+ * The photo is kept. It is a picture of the thing on your counter; the scan
+ * only answers what the thing is.
+ *
+ * An unknown code is still written down. Plenty of barcodes aren't in Open
+ * Food Facts, and the digits remain worth having next to a name you type.
+ */
+export async function applyBarcode(
+  row: InboxItem,
+  raw: string,
+): Promise<{ ok: boolean; name?: string }> {
+  if (row.id == null) return { ok: false }
+  const barcode = raw.replace(/\D/g, '')
+  if (!barcode) return { ok: false }
+
+  const found = await lookupBarcode(barcode).catch(() => null)
+  await db.inbox.update(row.id, {
+    barcode,
+    name: found?.name ?? row.name,
+    brand: found?.brand ?? row.brand,
+    category: found?.category ?? row.category,
+    nutrition: found?.nutrition ?? row.nutrition,
+    scanned: true,
+    guessSource: 'barcode',
+    guessNote: found
+      ? undefined
+      : 'Barcode saved, but it is not in Open Food Facts — give it a name',
+  })
+  return { ok: Boolean(found), name: found?.name ?? row.name }
+}
+
+/**
  * Re-reads every photo still waiting for a name.
  *
  * The scanner has been wrong before — it spent a release never running at all
