@@ -16,8 +16,10 @@ interface AuthState {
   householdId: number | null
   /** True until the stored session has been checked, so the app can wait. */
   loading: boolean
-  /** Set when a signed-in account somehow has no household — recoverable, not fatal. */
+  /** Set when something actually went wrong. Having no household is not an error. */
   error: string | null
+  /** Re-read the membership, e.g. straight after joining with a code. */
+  refreshHousehold: () => void
   signOut: () => Promise<void>
 }
 
@@ -26,6 +28,7 @@ const AuthContext = createContext<AuthState>({
   householdId: null,
   loading: true,
   error: null,
+  refreshHousehold: () => {},
   signOut: async () => {},
 })
 
@@ -38,6 +41,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [householdId, setHousehold] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Bumped after joining a household so the membership lookup runs again.
+  const [reload, setReload] = useState(0)
 
   useEffect(() => {
     if (!supabaseConfigured) {
@@ -86,9 +91,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (err) {
           setError(err.message)
         } else if (!data) {
-          // The signup trigger should make this impossible. Saying so beats an
-          // empty kitchen that looks like data loss.
-          setError('This account has no household yet. Sign out and back in, or say so and it can be created.')
+          // Expected for a new account: households are no longer created
+          // automatically, so the app shows the join screen rather than an
+          // error. Leaving householdId null is the signal.
+          setError(null)
+          setHousehold(null)
+          setHouseholdId(null)
         } else {
           setError(null)
           setHousehold(data.household_id)
@@ -100,7 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
 
     return () => { cancelled = true }
-  }, [session])
+  }, [session, reload])
 
   // One realtime channel for the session, so a change on the iPad reaches the
   // phone without either polling.
@@ -115,6 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     householdId,
     loading,
     error,
+    refreshHousehold: () => setReload((n) => n + 1),
     async signOut() {
       await supabase.auth.signOut()
     },

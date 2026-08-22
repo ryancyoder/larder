@@ -4,6 +4,7 @@ import { ToastProvider } from './app/toast'
 import { LayoutProvider } from './app/layout'
 import { AuthProvider, useAuth } from './app/auth'
 import SignIn from './screens/SignIn'
+import JoinHousehold from './screens/JoinHousehold'
 import { useCategories, useKitchen, useShopList } from './app/data'
 import { expiringSoon } from './lib/inventory'
 import Kitchen from './screens/Kitchen'
@@ -48,7 +49,7 @@ export default function App() {
  * who is already signed in, which reads as data loss.
  */
 function Gate() {
-  const { session, householdId, loading, error } = useAuth()
+  const { session, householdId, loading, error, refreshHousehold } = useAuth()
 
   if (loading) {
     return (
@@ -68,7 +69,9 @@ function Gate() {
       </div>
     )
   }
-  if (householdId == null) return <SignIn />
+  // Signed in, but not in a kitchen yet — offer the code rather than bouncing
+  // back to a sign-in screen they have already completed.
+  if (householdId == null) return <JoinHousehold onJoined={refreshHousehold} />
   return <Shell />
 }
 
