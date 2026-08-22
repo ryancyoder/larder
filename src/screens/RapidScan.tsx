@@ -120,9 +120,14 @@ export default function RapidScan({ onClose }: { onClose: () => void }) {
         </>
       }
     >
-      <div className={`scanner rapid${flash ? ' pulse' : ''}`} key={flash}>
+      {/* No key on this container. Keying it to restart the flash animation
+          would remount the subtree, destroying the <video> the camera stream is
+          attached to — the picture goes black after the first scan. The key
+          lives on the throwaway flash overlay instead. */}
+      <div className="scanner rapid">
         <video ref={videoRef} muted playsInline />
         {!error && <div className="scanner-frame" aria-hidden />}
+        {flash > 0 && <span key={flash} className="scan-flash" aria-hidden />}
       </div>
 
       {error && <p className="gate-error">{error}</p>}

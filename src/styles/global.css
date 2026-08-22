@@ -1952,8 +1952,17 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
 /* Rapid scanning: the camera stays live, so a scan needs to be visible as well
    as audible — the frame flashes on each accepted read. */
 .scanner.rapid { max-height: 34vh; }
-.scanner.rapid.pulse .scanner-frame { animation: scan-hit 260ms ease-out; }
+/* A throwaway element, remounted per scan so the animation replays. It must
+   not wrap the video: remounting that kills the camera stream. */
+.scan-flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 3px solid rgba(16, 185, 129, 0.95);
+  border-radius: var(--r-md);
+  animation: scan-hit 320ms ease-out forwards;
+}
 @keyframes scan-hit {
-  0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.75); border-color: rgba(16,185,129,0.95); }
-  100% { box-shadow: 0 0 0 22px rgba(16, 185, 129, 0); }
+  0%   { opacity: 1; background: rgba(16, 185, 129, 0.28); }
+  100% { opacity: 0; background: rgba(16, 185, 129, 0); }
 }
