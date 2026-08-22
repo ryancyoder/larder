@@ -6,6 +6,7 @@ import { usePhoto } from '../app/usePhoto'
 import { applyBarcode, confirmInbox, discardInbox, importPhotos, rescan, rescanAll, updateInbox, type ImportProgress } from '../lib/inbox'
 import { scanningAvailable } from '../lib/barcode'
 import BarcodeScanner from '../components/BarcodeScanner'
+import RapidScan from './RapidScan'
 import { loadPhotoBlob } from '../lib/photos'
 import { identifyPhoto, AIError } from '../lib/ai'
 import { getSetting } from '../db/db'
@@ -21,6 +22,7 @@ import { useToast } from '../app/toast'
  * if you ask for it.
  */
 export default function Unpack({ onClose }: { onClose: () => void }) {
+  const [rapid, setRapid] = useState(false)
   const rows = useInbox()
   const places = usePlaces() ?? []
   const cats = useCategories() ?? []
@@ -135,6 +137,11 @@ export default function Unpack({ onClose }: { onClose: () => void }) {
         <button className="btn primary" disabled={!!progress} onClick={() => fileRef.current?.click()}>
           {progress ? `Importing ${progress.done}/${progress.total}…` : '＋ Add photos'}
         </button>
+        {scanningAvailable() && (
+          <button className="btn" disabled={!!progress} onClick={() => setRapid(true)}>
+            ⚡ Scan a shop
+          </button>
+        )}
         {unnamed.length > 0 && (
           <button className="btn" disabled={!!scanBusy || !!aiBusy} onClick={scanAgain}>
             {scanBusy ? `Scanning ${scanBusy.done}/${scanBusy.total}…` : `🔎 Scan the ${unnamed.length} unknown`}
@@ -193,6 +200,8 @@ export default function Unpack({ onClose }: { onClose: () => void }) {
         </button>
         <button className="btn" onClick={onClose}>Done</button>
       </footer>
+
+      {rapid && <RapidScan onClose={() => setRapid(false)} />}
     </div>
   )
 

@@ -67,15 +67,36 @@ async function openCamera(): Promise<MediaStream> {
 }
 
 /**
- * Starts scanning into `video`. Calls `onResult` once with the first barcode
- * seen twice in a row — a cheap guard against a misread on a blurry frame.
+ * Starts scanning into `video`. Calls `onResult` with a barcode seen twice in a
+ * row — a cheap guard against a misread on a blurry frame.
+ *
+ * By default it fires once and stops, which is what a "scan this one thing"
+ * dialog wants. In `continuous` mode it keeps running so a whole shop can be
+ * scanned without stopping between items.
+ *
+ * Continuous scanning needs its own guard: a barcode sits in frame for many
+ * frames, so the same tin would otherwise report itself dozens of times. The
+ * same code is therefore ignored for `repeatMs` after it fires — long enough to
+ * move the packet away, short enough that deliberately scanning a second
+ * identical tin still registers.
  */
+export interface ScannerOptions {
+  /** Keep scanning after the first hit. Default false. */
+  continuous?: boolean
+  /** How long the same code is ignored for in continuous mode. */
+  repeatMs?: number
+}
+
 export async function startScanner(
   video: HTMLVideoElement,
   onResult: (code: string) => void,
+  options: ScannerOptions = {},
 ): Promise<ScannerHandle> {
+  const { continuous = false, repeatMs = 1800 } = options
   let stopped = false
   let lastSeen: string | null = null
+  let lastFired: string | null = null
+  let lastFiredAt = 0
 
   const accept = (code: string) => {
     if (stopped) return
@@ -84,6 +105,16 @@ export async function startScanner(
     // Require the same value on two consecutive reads before trusting it.
     if (clean !== lastSeen) {
       lastSeen = clean
+      return
+    }
+    if (continuous) {
+      const now = Date.now()
+      if (clean === lastFired && now - lastFiredAt < repeatMs) return
+      lastFired = clean
+      lastFiredAt = now
+      // Start the two-reads guard again so the next item is judged on its own.
+      lastSeen = null
+      onResult(clean)
       return
     }
     stopped = true
