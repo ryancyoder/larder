@@ -1,3 +1,7 @@
+> **⚠️ Superseded and out of date.** The three-app merge described below was
+> cancelled — Larder stays an independent app. See **HANDOFF.md** for current
+> developer notes. This file is kept only for the measurements it recorded.
+
 # Merge brief — three household apps into one
 
 Written 2026-08-16 by the Claude session that built Larder, for whichever session does the
