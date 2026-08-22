@@ -2022,3 +2022,38 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
   .ktable { font-size: 13.5px; }
   .ktable td { padding: 8px 8px 8px 0; }
 }
+
+/* Kitchen toolbar: search, a filter button that reports its own state, and the
+   two view controls — on one line instead of four stacked segmented bars. */
+.ktools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ktools .search { flex: 1 1 190px; min-width: 0; }
+.ktools .btn { flex: none; }
+.ksel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+.ksel select {
+  font-size: 13px;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--text);
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm, 8px);
+  padding: 6px 8px;
+}
+.ksel select:hover { border-color: var(--line-strong); }
+
+/* On a phone the labels are the first thing to go; the options say enough. */
+@media (max-width: 620px) {
+  .ktools { gap: 6px; }
+  .ktools .search { flex: 1 1 100%; }
+  .ksel > span { display: none; }
+  .ksel select { padding: 6px 6px; }
+}
