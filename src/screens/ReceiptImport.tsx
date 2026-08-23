@@ -7,8 +7,8 @@ import { lookupBarcode } from '../lib/openfoodfacts'
 import { todayISO } from '../lib/dates'
 import {
   applyLineLookup, commitReceipt, computedTotal, parseReceipt, receiptFromScan,
-  setLineField, setLineQty,
-  type LineLookup, type ParsedReceipt, type ReceiptLine,
+  recogniseLines, recognitionSummary, setLineField, setLineQty,
+  type LineLookup, type LineRecognition, type ParsedReceipt, type ReceiptLine,
 } from '../lib/receipt'
 
 /**
@@ -35,6 +35,7 @@ export default function ReceiptImport({ onClose }: { onClose: () => void }) {
   const [store, setStore] = useState('')
   const [date, setDate] = useState(todayISO())
   const [lookups, setLookups] = useState<Record<string, LineLookup>>({})
+  const [known, setKnown] = useState<Record<string, LineRecognition>>({})
   const [reading, setReading] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -111,6 +112,23 @@ export default function ReceiptImport({ onClose }: { onClose: () => void }) {
     return () => { cancelled = true }
   }, [parsed])
 
+  /**
+   * Matched against the catalogue whenever the shop changes, because the till
+   * code only identifies a product alongside the shop that issued it — typing
+   * "ALDI" over a blank store field is what makes the whole receipt resolve.
+   */
+  useEffect(() => {
+    if (!parsed) return
+    let cancelled = false
+    recogniseLines(lines, store)
+      .then((found) => { if (!cancelled) setKnown(found) })
+      .catch(() => { /* a review that cannot recognise still imports fine */ })
+    return () => { cancelled = true }
+    // Intentionally not on `lines`: retyping a name should not re-run this, and
+    // the identifiers it matches on cannot be edited.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parsed, store])
+
   const items = lines.filter((l) => l.kind === 'item')
   const chosen = items.filter((l) => l.include && l.qty > 0)
   const units = chosen.reduce((n, l) => n + l.qty, 0)
@@ -120,6 +138,7 @@ export default function ReceiptImport({ onClose }: { onClose: () => void }) {
   // an error, so the gap is reported rather than flagged — the number is there
   // to be recognised, not obeyed.
   const gap = printed != null ? Math.round((printed - computed) * 100) / 100 : null
+  const seen = recognitionSummary(lines, known)
 
   async function save() {
     setBusy(true)
@@ -243,6 +262,19 @@ export default function ReceiptImport({ onClose }: { onClose: () => void }) {
         )}
       </div>
 
+      {(seen.known > 0 || seen.fresh > 0) && (
+        <div
+          className="row"
+          style={{ gap: 10, alignItems: 'baseline', fontSize: 12.5, color: 'var(--text-mute)' }}
+        >
+          <span><strong style={{ color: 'var(--text-dim)' }}>{seen.known}</strong> seen before</span>
+          <span>· <strong style={{ color: 'var(--text-dim)' }}>{seen.fresh}</strong> new to the catalog</span>
+          {seen.rises > 0 && (
+            <span>· {seen.rises} dearer than last time, {money(seen.risePounds)} in all</span>
+          )}
+        </div>
+      )}
+
       {parsed.ignored > 0 && (
         <p style={{ fontSize: 11.5, color: 'var(--text-mute)', margin: 0 }}>
           {parsed.ignored} line{parsed.ignored === 1 ? '' : 's'} skipped as totals, tax or card
@@ -259,6 +291,7 @@ export default function ReceiptImport({ onClose }: { onClose: () => void }) {
             onToggle={() => setLines((p) => setLineField(p, line.key, { include: !line.include }))}
             onQty={(qty) => setLines((p) => setLineQty(p, line.key, qty))}
             onName={(description) => setLines((p) => setLineField(p, line.key, { description }))}
+            seen={known[line.key]}
           />
         ))}
       </div>
@@ -267,15 +300,17 @@ export default function ReceiptImport({ onClose }: { onClose: () => void }) {
 }
 
 function LineRow({
-  line, onToggle, onQty, onName,
+  line, onToggle, onQty, onName, seen,
 }: {
   line: ReceiptLine
   onToggle: () => void
   onQty: (qty: number) => void
   onName: (name: string) => void
+  seen?: LineRecognition
 }) {
   const discount = line.kind === 'discount'
   const size = line.size != null ? ` · ${line.size}${line.sizeUnit ?? ''}` : ''
+  const change = seen?.price
 
   return (
     <div
@@ -310,8 +345,24 @@ function LineRow({
         />
         <span style={{ display: 'block', fontSize: 11, color: 'var(--text-mute)' }}>
           {discount ? 'Discount — not stocked' : line.rawDescription}
-          {line.barcode ? ` · ${line.barcode}` : ''}{size}
+          {line.sku ? ` · #${line.sku}` : line.barcode ? ` · ${line.barcode}` : ''}{size}
+          {!discount && seen && (
+            seen.known
+              ? <span> · seen before{seen.needsScan ? ', still to scan' : ''}</span>
+              : <span> · new to the catalog</span>
+          )}
         </span>
+        {change && change.direction !== 'same' && (
+          <span
+            style={{
+              display: 'block', fontSize: 11, fontWeight: 600,
+              color: change.direction === 'up' ? 'var(--danger)' : 'var(--ok, var(--text-mute))',
+            }}
+          >
+            {change.direction === 'up' ? '↑' : '↓'} {money(Math.abs(change.delta))} each
+            {' '}({change.pct > 0 ? '+' : ''}{change.pct}%) — was {money(change.previous)}
+          </span>
+        )}
       </span>
 
       {!discount && (

@@ -1,9 +1,10 @@
 import { db } from '../db/db'
-import type { Category, Nutrition, Product, Unit } from '../db/schema'
+import type { Category, Item, Nutrition, Product, Unit } from '../db/schema'
 import { guessCategory } from './categories'
 import { matchFood } from './foods'
 import { lookupBarcode } from './openfoodfacts'
 import { todayISO } from './dates'
+import { unitPrice } from './inventory'
 
 /**
  * The product catalogue.
@@ -268,6 +269,78 @@ export async function sweepOpenFoodFacts(
 
   state.current = undefined
   return state
+}
+
+// ---------------------------------------------------------------------------
+// What it cost last time
+//
+// The catalogue does not store a price — that is a fact about a purchase, and
+// every purchase is an Item that already records one. But "you paid more for
+// this than last time" is exactly the question a second receipt raises, so the
+// answer is derived here rather than cached there.
+// ---------------------------------------------------------------------------
+
+export interface LastPaid {
+  unitPrice: number
+  date: string
+}
+
+/**
+ * The most recent price paid per product, from stock.
+ *
+ * One pass over every item rather than a query per line: a 73-line receipt
+ * would otherwise be 73 round trips to answer a question about a few dozen
+ * rows.
+ *
+ * Compared per *unit*, never per line. Two jars at $5.18 and one at $2.59 are
+ * the same price, and a comparison that missed that would cry inflation every
+ * time somebody bought a spare.
+ */
+export function lastPaidByProduct(items: Item[]): Map<number, LastPaid> {
+  const out = new Map<number, LastPaid>()
+  for (const item of items) {
+    if (item.productId == null || !item.price || !item.qtyInitial) continue
+    const seen = out.get(item.productId)
+    // Ties break on the later row, which is the later purchase: two shops on
+    // one date still happened in an order.
+    if (seen && seen.date > item.purchasedAt) continue
+    out.set(item.productId, {
+      unitPrice: Math.round(unitPrice(item) * 100) / 100,
+      date: item.purchasedAt,
+    })
+  }
+  return out
+}
+
+export type PriceDirection = 'up' | 'down' | 'same'
+
+export interface PriceChange {
+  previous: number
+  current: number
+  /** Signed, in dollars, rounded to the cent. */
+  delta: number
+  /** Signed percentage, rounded to one place. */
+  pct: number
+  direction: PriceDirection
+}
+
+/**
+ * Two unit prices compared.
+ *
+ * Rounded to the cent before comparing, so a stored 1.6966666 does not report
+ * itself as a rise over 1.70.
+ */
+export function comparePrice(previous: number, current: number): PriceChange {
+  const a = Math.round(previous * 100) / 100
+  const b = Math.round(current * 100) / 100
+  const delta = Math.round((b - a) * 100) / 100
+  return {
+    previous: a,
+    current: b,
+    delta,
+    pct: a > 0 ? Math.round((delta / a) * 1000) / 10 : 0,
+    direction: delta > 0 ? 'up' : delta < 0 ? 'down' : 'same',
+  }
 }
 
 // ---------------------------------------------------------------------------

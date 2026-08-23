@@ -1,4 +1,5 @@
 import { computedTotal, expandDescription, parseReceipt, receiptFromScan } from './receipt'
+import { comparePrice, lastPaidByProduct } from './products'
 
 /**
  * Fixtures for the receipt parser. Run with `npm run test:receipt`.
@@ -322,6 +323,39 @@ describe('Till shorthand', () => {
 })
 
 // ---------------------------------------------------------------------------
+
+describe('Comparing what a thing cost last time', () => {
+  // Per unit, always. Two jars at $5.18 and one at $2.59 are the same price,
+  // and a comparison that missed that would cry inflation every time somebody
+  // bought a spare.
+  check('a rise', comparePrice(2.29, 2.59).direction, 'up')
+  check('by how much', comparePrice(2.29, 2.59).delta, 0.3)
+  check('as a percentage', comparePrice(2.00, 2.50).pct, 25)
+  check('a fall', comparePrice(2.59, 2.29).direction, 'down')
+  check('and its sign', comparePrice(2.59, 2.29).delta, -0.3)
+  check('no change', comparePrice(2.59, 2.59).direction, 'same')
+  // Stored money is a float. 1.6966666 must not report itself as a rise.
+  check('rounded before comparing', comparePrice(1.6966666, 1.7).direction, 'same')
+  check('a first purchase has no percentage to give', comparePrice(0, 2.59).pct, 0)
+})
+
+describe('Last paid, derived from stock rather than cached', () => {
+  const items = [
+    { productId: 1, price: 2.29, qtyInitial: 1, purchasedAt: '2026-08-01' },
+    { productId: 1, price: 2.59, qtyInitial: 1, purchasedAt: '2026-08-21' },
+    // Two jars in one line: the unit price is half the line, not the line.
+    { productId: 2, price: 5.18, qtyInitial: 2, purchasedAt: '2026-08-21' },
+    // No price recorded — cannot contribute an answer.
+    { productId: 3, price: undefined, qtyInitial: 1, purchasedAt: '2026-08-21' },
+  ] as Parameters<typeof lastPaidByProduct>[0]
+
+  const map = lastPaidByProduct(items)
+  check('the most recent wins', map.get(1)?.unitPrice, 2.59)
+  check('and carries its date', map.get(1)?.date, '2026-08-21')
+  check('a multi-buy is priced per unit', map.get(2)?.unitPrice, 2.59)
+  check('an unpriced purchase says nothing', map.get(3), undefined)
+  check('an unknown product says nothing', map.get(99), undefined)
+})
 
 console.log(
   failures
