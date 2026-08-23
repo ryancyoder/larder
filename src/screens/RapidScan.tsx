@@ -66,13 +66,26 @@ export default function RapidScan({ onClose }: { onClose: () => void }) {
       .catch(() => setLines((prev) => applyLookup(prev, clean, null)))
   }, [beep])
 
+  /**
+   * The callback, held in a ref so the camera effect can depend on nothing.
+   *
+   * A black viewport has two causes and they look identical (HANDOFF §5). One
+   * is a changing React `key` above the <video>. The other is this effect
+   * re-running: its cleanup stops the stream, and anything unstable in its
+   * dependencies — a prop redefined each render, a live query that re-runs on
+   * every write — restarts the camera underneath you. Depending on nothing at
+   * all is the only version that cannot regress.
+   */
+  const onCodeRef = useRef(onCode)
+  onCodeRef.current = onCode
+
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       const video = videoRef.current
       if (!video) return
       try {
-        const handle = await startScanner(video, onCode, { continuous: true })
+        const handle = await startScanner(video, (code) => onCodeRef.current(code), { continuous: true })
         if (cancelled) { handle.stop(); return }
         handleRef.current = handle
       } catch (err) {
@@ -84,7 +97,8 @@ export default function RapidScan({ onClose }: { onClose: () => void }) {
       handleRef.current?.stop()
       handleRef.current = null
     }
-  }, [onCode])
+    // Mount only. See the note on onCodeRef above.
+  }, [])
 
   const total = lines.reduce((n, l) => n + l.qty, 0)
   const unknown = lines.filter((l) => l.status === 'unknown').length

@@ -19,6 +19,19 @@ export default function BarcodeScanner({
   const [engine, setEngine] = useState<ScannerHandle['engine'] | null>(null)
   const [manual, setManual] = useState('')
 
+  /**
+   * The callback, held in a ref so the camera effect can depend on nothing.
+   *
+   * A black viewport has two causes and they look identical (HANDOFF §5). One
+   * is a changing React `key` above the <video>. The other is this effect
+   * re-running: its cleanup stops the stream, and anything unstable in its
+   * dependencies — a prop redefined each render, a live query that re-runs on
+   * every write — restarts the camera underneath you. Depending on nothing at
+   * all is the only version that cannot regress.
+   */
+  const onDetectedRef = useRef(onDetected)
+  onDetectedRef.current = onDetected
+
   useEffect(() => {
     let cancelled = false
 
@@ -28,7 +41,7 @@ export default function BarcodeScanner({
       try {
         const handle = await startScanner(video, (code) => {
           handleRef.current?.stop()
-          onDetected(code)
+          onDetectedRef.current(code)
         })
         if (cancelled) {
           handle.stop()
@@ -46,7 +59,9 @@ export default function BarcodeScanner({
       handleRef.current?.stop()
       handleRef.current = null
     }
-  }, [onDetected])
+    // Mount only. `onDetected` is redefined by every parent render — depending
+    // on it restarted the camera each time the inbox changed underneath.
+  }, [])
 
   return (
     <Sheet
