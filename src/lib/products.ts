@@ -201,6 +201,7 @@ export async function upsertProduct(draft: ProductDraft): Promise<Product> {
     size: draft.size,
     sizeUnit: draft.sizeUnit,
     nutrition: draft.nutrition,
+    isStaple: false,
     createdAt: todayISO(),
   }
   const id = await db.products.add(row)
@@ -348,6 +349,24 @@ export async function sweepOpenFoodFacts(
 
   state.current = undefined
   return state
+}
+
+/**
+ * Marks a product a staple, or stops it being one.
+ *
+ * Every staple toggle in the app routes here, so there is exactly one place the
+ * decision lives. Clearing it clears the par level too: "rebuy below two" is
+ * meaningless once nothing is being rebought.
+ */
+export async function setProductStaple(
+  productId: number,
+  isStaple: boolean,
+  parQty?: number,
+): Promise<void> {
+  await db.products.update(productId, {
+    isStaple,
+    parQty: isStaple ? (parQty && parQty > 0 ? parQty : 1) : undefined,
+  })
 }
 
 // ---------------------------------------------------------------------------

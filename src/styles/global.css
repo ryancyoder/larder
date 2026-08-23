@@ -2094,6 +2094,24 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
 .app.focused .main { padding-bottom: 40px; }
 .app.focused .topbar { gap: 10px; }
 
+/* A star that toggles in place. Sized like the picture beside it so the two
+   read as one leading block rather than a stray control. */
+.cat-table .c-staple { width: 1%; padding-right: 4px; text-align: center; }
+.staple-star {
+  padding: 2px 4px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-size: 17px;
+  line-height: 1;
+  color: var(--text-mute);
+  opacity: 0.5;
+  transition: color 0.14s var(--ease), opacity 0.14s var(--ease), transform 0.14s var(--ease);
+}
+.staple-star:hover { opacity: 1; transform: scale(1.15); }
+.staple-star.on { color: var(--warn, #e0a33e); opacity: 1; }
+.staple-star:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+
 /* The picture cell is the way to set one, so it has to look pressable. */
 .pic-swap {
   display: block;
@@ -2247,9 +2265,13 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
   .cat-table .c-food { display: none; }
 }
 @media (max-width: 620px) {
-  /* Down to what a phone can hold: the picture, what it is, its code, whether
-     the database knows it, and what it cost. The catalogue is an iPad screen. */
-  .cat-table .c-sku { display: none; }
+  /* Down to what a phone can hold: the star, the picture, what it is, whether
+     the database knows it, and what it cost. The barcode goes with the item
+     number — thirteen monospaced digits are the least readable thing on a small
+     screen and the least likely to be what someone came for. The catalogue is
+     an iPad screen. */
+  .cat-table .c-sku,
+  .cat-table .c-barcode { display: none; }
 }
 
 /* Kitchen toolbar: search, a filter button that reports its own state, and the

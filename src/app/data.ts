@@ -17,11 +17,20 @@ import type {
  * One query feeding `buildViews`, so a kitchen full of tiles resolves its names
  * and pictures without every row subscribing to the products table.
  */
-async function catalogue(): Promise<Map<number, { name?: string; photoId?: number }>> {
+type CatalogueFacts = { name?: string; photoId?: number; isStaple?: boolean; parQty?: number }
+
+async function catalogue(): Promise<Map<number, CatalogueFacts>> {
   const rows = await db.products.toArray()
-  const out = new Map<number, { name?: string; photoId?: number }>()
+  const out = new Map<number, CatalogueFacts>()
   for (const p of rows) {
-    if (p.id != null) out.set(p.id, { name: productName(p), photoId: p.photoId })
+    if (p.id != null) {
+      out.set(p.id, {
+        name: productName(p),
+        photoId: p.photoId,
+        isStaple: p.isStaple,
+        parQty: p.parQty,
+      })
+    }
   }
   return out
 }

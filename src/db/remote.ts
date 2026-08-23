@@ -123,6 +123,7 @@ const MAPS: Record<string, FieldMap> = {
   products: {
     foodKey: 'food_key', sizeUnit: 'size_unit', photoId: 'photo_id',
     createdAt: 'created_at', offStatus: 'off_status', displayName: 'display_name',
+    isStaple: 'is_staple', parQty: 'par_qty',
   },
   reservations: {
     itemId: 'item_id', planId: 'plan_id', personKey: 'person_key', createdAt: 'created_at',

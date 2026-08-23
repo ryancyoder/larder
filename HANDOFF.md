@@ -124,6 +124,23 @@ the catalogue's name where there is one, the item's own otherwise. The Kitchen t
 tiles, Quick add, Reserved, Foods and the trip sheet all read that. `item.name` still means
 what that particular purchase was called.
 
+### Staples belong to the product
+
+`products.is_staple` and `products.par_qty` (`0009`). "We always keep milk in" is a fact
+about milk, not about a carton — held per item it had to be re-decided on every purchase,
+and two cartons of the same thing could disagree, with the shopping list following whichever
+it read first.
+
+`items.is_staple` and `items.par_qty` stay as the fallback for stock with no catalogue
+entry, and `0009` backfills the product from any items already marked.
+
+Unlike the name and the picture, **`ItemView.isStaple` overrides rather than shadows**.
+Those two are display choices with a sensible per-item answer; this is a decision about the
+product, and every consumer — `generateList` included — should follow the catalogue's
+version of it. Every toggle in the app routes through `setProductStaple()`, so there is one
+place the decision lives: the star in the Catalog, the star on a Kitchen tile, and the
+checkbox in the item edit sheet all end up there when the item is linked to a product.
+
 ### Product photos are the master, and everything else derives from them
 
 `Product.photoId` is the reference picture. **`ItemView.displayPhotoId` resolves it** —

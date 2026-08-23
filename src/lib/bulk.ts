@@ -87,7 +87,21 @@ export async function applyBulk(ids: number[], changes: BulkChanges): Promise<nu
  * staple" means exactly one thing — including the par level, without which a
  * staple would never trigger a restock.
  */
+/**
+ * Starring an item from a tile.
+ *
+ * Staple-ness lives on the product, so this follows the link when there is one
+ * and falls back to the item only for stock with no catalogue entry. Without
+ * that, starring a carton would mark that carton and the next one would come
+ * home unstarred.
+ */
 export async function setStaple(id: number, isStaple: boolean): Promise<void> {
+  const item = await db.items.get(id)
+  if (item?.productId != null) {
+    const { setProductStaple } = await import('./products')
+    await setProductStaple(item.productId, isStaple, item.parQty)
+    return
+  }
   await applyBulk([id], { isStaple })
 }
 

@@ -5,7 +5,7 @@ import { categoryMeta } from '../lib/categories'
 import { foodMeta } from '../lib/foods'
 import {
   friendlyName, lastPaidByProduct, offLabel, productName, searchProducts,
-  sweepOpenFoodFacts, type LastPaid, type SweepProgress,
+  setProductStaple, sweepOpenFoodFacts, type LastPaid, type SweepProgress,
 } from '../lib/products'
 import { CatDot, Empty, Glyph, Seg, Sheet } from '../components/ui'
 import PhotoCapture from '../components/PhotoCapture'
@@ -44,10 +44,10 @@ type View = 'all' | 'unscanned' | 'scanned'
  * Each key carries the direction it should open in, because "sensible first" is
  * not one answer for every column: names read A–Z, prices read dearest first.
  */
-type SortKey = 'photo' | 'name' | 'catalogName' | 'brand' | 'food' | 'category' | 'store' | 'sku' | 'barcode' | 'off' | 'size' | 'price'
+type SortKey = 'photo' | 'staple' | 'name' | 'catalogName' | 'brand' | 'food' | 'category' | 'store' | 'sku' | 'barcode' | 'off' | 'size' | 'price'
 type Dir = 'asc' | 'desc'
 
-const OPENS_DESC: SortKey[] = ['price', 'size', 'photo']
+const OPENS_DESC: SortKey[] = ['price', 'size', 'photo', 'staple']
 
 interface SortState { key: SortKey; dir: Dir }
 
@@ -66,6 +66,7 @@ function offRank(p: Product): number {
 function value(p: Product, key: SortKey, paid: Map<number, LastPaid>): string | number {
   switch (key) {
     case 'photo': return p.photoId != null ? 1 : 0
+    case 'staple': return p.isStaple ? 1 : 0
     case 'catalogName': return p.name.toLowerCase()
     case 'brand': return p.brand?.toLowerCase() ?? LAST
     case 'food': return foodMeta(p.foodKey)?.name.toLowerCase() ?? LAST
@@ -276,6 +277,7 @@ export default function Catalogue({ onBack }: { onBack?: () => void }) {
                 <thead>
                   <tr>
                     <SortTh sort={sort} onSort={toggle} col="photo" className="c-pic" label="" title="Picture" />
+                    <SortTh sort={sort} onSort={toggle} col="staple" className="c-staple" label="★" title="Staple — rebought when it runs low" />
                     <SortTh sort={sort} onSort={toggle} col="name" className="k-name" label="Product" />
                     {/* The basic food, not the product: fresh, canned and frozen
                         beets are three products and one food. See lib/foods.ts. */}
@@ -314,6 +316,11 @@ export default function Catalogue({ onBack }: { onBack?: () => void }) {
                       product={product}
                       paid={product.id != null ? paid.get(product.id) : undefined}
                       onPhoto={() => setEditing(product)}
+                      onStaple={() => {
+                        if (product.id != null) {
+                          void setProductStaple(product.id, !product.isStaple, product.parQty)
+                        }
+                      }}
                     />
                   ))}
                 </tbody>
@@ -351,6 +358,7 @@ const money = (n: number) => `$${n.toFixed(2)}`
 function ProductSheet({ product, onClose }: { product: Product; onClose: () => void }) {
   const toast = useToast()
   const [name, setName] = useState(productName(product))
+  const [par, setPar] = useState(product.isStaple ? String(product.parQty ?? 1) : '')
 
   async function setPhoto(photoId: number | undefined) {
     if (product.id == null) return
@@ -366,7 +374,9 @@ function ProductSheet({ product, onClose }: { product: Product; onClose: () => v
     await db.products.update(product.id, {
       displayName: !next || next === product.name ? undefined : next,
     })
-    toast('Name saved')
+    const level = Number(par)
+    await setProductStaple(product.id, par.trim() !== '' && level > 0, level)
+    toast('Saved')
     onClose()
   }
 
@@ -402,6 +412,22 @@ function ProductSheet({ product, onClose }: { product: Product; onClose: () => v
             </button>
           </>
         )}
+      </p>
+
+      <label className="field">
+        <span>Rebuy below</span>
+        <input
+          type="number"
+          min="0"
+          step="0.5"
+          value={par}
+          placeholder="not a staple"
+          onChange={(e) => setPar(e.target.value)}
+        />
+      </label>
+      <p style={{ fontSize: 11.5, color: 'var(--text-mute)', margin: 0 }}>
+        Leave blank unless this is something the house always keeps in. With a level set, the
+        shopping list rebuys it whenever stock drops below.
       </p>
 
       <PhotoCapture photoId={product.photoId} onChange={setPhoto} label="Reference picture" />
@@ -448,14 +474,32 @@ function SortTh({
 }
 
 function Row({
-  product, paid, onPhoto,
-}: { product: Product; paid?: LastPaid; onPhoto: () => void }) {
+  product, paid, onPhoto, onStaple,
+}: { product: Product; paid?: LastPaid; onPhoto: () => void; onStaple: () => void }) {
   const meta = categoryMeta(product.category)
   const food = foodMeta(product.foodKey)
   const off = offLabel(product)
 
   return (
     <tr className={`krow${product.barcode ? '' : ' spent'}`}>
+      <td className="c-staple">
+        {/* One tap, because starring is a decision made while reading the list,
+            not something worth opening a sheet for. */}
+        <button
+          className={`staple-star${product.isStaple ? ' on' : ''}`}
+          onClick={onStaple}
+          aria-pressed={product.isStaple}
+          title={product.isStaple
+            ? `A staple — rebought below ${product.parQty ?? 1}`
+            : 'Mark as a staple'}
+          aria-label={product.isStaple
+            ? `${productName(product)} is a staple — tap to unmark`
+            : `Mark ${productName(product)} as a staple`}
+        >
+          {product.isStaple ? '★' : '☆'}
+        </button>
+      </td>
+
       <td className="c-pic">
         <button
           className="pic-swap"
