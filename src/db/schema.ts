@@ -514,4 +514,14 @@ export interface ItemView extends Item {
   reserved: number
   available: number
   holds: Reservation[]
+  /**
+   * The picture to show for this item.
+   *
+   * The catalogue holds the master: one reference photo per product, so every
+   * jar of the same hummus looks like itself rather than like whichever
+   * carton someone happened to photograph. `photoId` stays the item's *own*
+   * picture — what the edit sheets manage, and the fallback when the product
+   * has none — and this is what display code should read.
+   */
+  displayPhotoId?: number
 }

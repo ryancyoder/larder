@@ -2085,6 +2085,28 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
 }
 /* A placeholder is prose, not data — it must not inherit the barcode column's
    monospace and negative tracking, which renders "not scanned" with gaps in it. */
+/* A view that hides the nav to reclaim its width — the catalogue table, which
+   wants every pixel it can get. The rail is 216px in the wide layout, which is
+   the difference between nine columns and ten. */
+.app.focused .nav { display: none; }
+:root[data-layout='wide'] .app.focused { grid-template-columns: minmax(0, 1fr); }
+:root[data-layout='wide'] .app.focused .main { max-width: 1400px; }
+.app.focused .main { padding-bottom: 40px; }
+.app.focused .topbar { gap: 10px; }
+
+/* The picture cell is the way to set one, so it has to look pressable. */
+.pic-swap {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 99px;
+  cursor: pointer;
+  transition: transform 0.14s var(--ease), box-shadow 0.14s var(--ease);
+}
+.pic-swap:hover { transform: scale(1.08); box-shadow: 0 0 0 2px var(--accent); }
+.pic-swap:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
 /* A heading that sorts. The button fills the cell so the whole heading is the
    target, and inherits the th's type so nothing looks like a form control. */
 .ktable thead th .th-sort {
@@ -2189,20 +2211,23 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
    Columns go in order of how much each earns its width. */
 /* 1180px is the landscape iPad exactly, so every breakpoint sits below it —
    a `max-width: 1180px` rule would fire on the one device this is built for. */
-/* Ten columns need about 1040px of table; a landscape iPad gives 964, so one
-   has to go even there. Category is the one: Food already says what a thing is,
-   and the category is still on the row as the coloured dot beside the picture.
-   Measured, not guessed — every figure here came from the harness in §8. */
-@media (max-width: 1250px) {
+/* Ten columns need about 1040px of table. Hiding the nav in this view gives a
+   landscape iPad 1128px instead of 964, which is the difference between nine
+   columns and all ten — the 216px rail was the whole constraint.
+   Every figure here was measured with the harness in §8, not guessed, and every
+   breakpoint sits below 1180 so none of them fires on the iPad itself. */
+@media (max-width: 1050px) {
+  /* Food already says what a thing is, and the category survives on the row as
+     the coloured dot beside the picture. */
   .cat-table .k-cat { display: none; }
 }
-@media (max-width: 1050px) {
+@media (max-width: 940px) {
   .cat-table .c-brand { display: none; }
 }
-@media (max-width: 1000px) {
+@media (max-width: 860px) {
   .cat-table .c-size { display: none; }
 }
-@media (max-width: 880px) {
+@media (max-width: 760px) {
   .cat-table .c-food { display: none; }
 }
 @media (max-width: 620px) {

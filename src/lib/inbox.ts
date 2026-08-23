@@ -232,6 +232,13 @@ export async function confirmInbox(
     nutrition: row.nutrition,
   })
 
+  // A photographed grocery becomes the catalogue's reference picture when the
+  // product has none. This is where most of them will come from: ALDI's own
+  // brands are not in Open Food Facts, so there is no stock photo to fetch.
+  if (product.id != null && product.photoId == null && row.photoId != null) {
+    await db.products.update(product.id, { photoId: row.photoId })
+  }
+
   const itemId = await addItem({
     name,
     category,

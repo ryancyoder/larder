@@ -85,10 +85,35 @@ The complaint that motivated this table was really about duplicates, not disappe
   re-importing an old receipt must not undo either), `learnBarcode`, `recordPurchase`.
 - **The Catalog tab** browses it — Picture / Product / Brand / Food / Category / SKU /
   Barcode / Open Food Facts / Size / Price each, with filters for *To scan* and *Scanned*.
-  Ten columns need ~1040px of table and a landscape iPad gives 964, so **Category is hidden
-  below 1250px** — Food already says what a thing is, and the category survives as the
-  coloured dot beside the picture. Every breakpoint sits *below* 1180 rather than at it: a
-  `max-width: 1180px` rule fires on the exact device this is built for.
+  **The Catalog hides the nav** (`.app.focused`, driven by `FULL_WIDTH` in `App.tsx`) and
+  carries its own Back button instead. That is not cosmetic: the rail is 216px, which on a
+  landscape iPad is the difference between nine columns and all ten. Back returns to the tab
+  you came from, not always the Kitchen.
+  Every breakpoint sits *below* 1180 — a `max-width: 1180px` rule fires on the exact device
+  this is built for, which had silently hidden two columns once already.
+
+### Product photos are the master, and everything else derives from them
+
+`Product.photoId` is the reference picture. **`ItemView.displayPhotoId` resolves it** —
+the product's photo where there is one, the item's own otherwise — and the Kitchen tiles,
+Quick add, the item sheet and the calendar all read that rather than `item.photoId`.
+`item.photoId` still means the item's *own* picture, which is what the edit sheets manage.
+
+Resolution happens once in `buildViews()` rather than per component: a lookup inside each
+tile would mean one live subscription per row, all re-running on any write.
+
+Pictures arrive three ways, and the catalogue's picture cell is a button that replaces any
+of them:
+
+1. **Open Food Facts**, on scan or during the sweep (`importProductPhoto`).
+2. **Promoted from the inbox** — confirming a photographed grocery gives its picture to the
+   product when the product has none. This is where most will come from, since ALDI's own
+   brands are not in Open Food Facts and have no stock photo to fetch.
+3. **Taken by hand** in the Catalog.
+
+A replaced photo is left in storage rather than deleted: items keep their own `photoId` as
+a fallback and may still point at it, and an orphaned blob is a cheaper mistake than a
+picture that vanishes somewhere else.
   **Every heading sorts**, and clicking the sorted one reverses it. Each key opens in the
   direction that reads best (names A–Z, prices dearest first), and the name breaks every tie
   so the order is stable.
