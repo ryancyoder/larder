@@ -26,7 +26,7 @@ const TABS: Array<{ key: Tab; label: string; glyph: string }> = [
   // Third view of the same shelf: the Kitchen has products as stock, Foods has
   // what they are, and this has their identity — one row per thing you buy,
   // however many times you buy it.
-  { key: 'catalogue', label: 'Catalogue', glyph: '📇' },
+  { key: 'catalogue', label: 'Catalog', glyph: '📇' },
   { key: 'plan', label: 'Plan', glyph: '🗓️' },
   { key: 'recipes', label: 'Recipes', glyph: '🍳' },
   { key: 'shop', label: 'Shop', glyph: '🛒' },
@@ -127,7 +127,9 @@ function Shell() {
                 style={{ width: '100%' }}
               >
                 <span className="glyph" aria-hidden>{t.glyph}</span>
-                {t.label}
+                {/* Wrapped so a narrow phone can ellipsise it rather than
+                    widening the pill past the screen. */}
+                <span className="tab-label">{t.label}</span>
                 {!!badges[t.key] && <span className="badge">{badges[t.key]}</span>}
               </button>
             </div>
