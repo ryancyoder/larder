@@ -88,6 +88,10 @@ The complaint that motivated this table was really about duplicates, not disappe
   which is where several hundred products are readable; the *Bought* column drops under
   900px and *SKU* under 620px, leaving a phone with what it is, its code, and whether the
   database knows it.
+- The Open Food Facts column is **headed with the words**, abbreviated to "OFF" only under
+  780px, and carries a visible legend rather than a tooltip. "OFF" alone reads as off/on and
+  was the first thing anyone asked about the table; a tooltip does not answer it on a touch
+  screen, where there is nothing to hover.
 - **`products.off_status`** (`0006`) records what Open Food Facts said, rather than the
   catalogue inferring it from whether `nutrition` came back — which is wrong both ways, since
   a listed product may declare nothing worth storing and nutrition can be typed by hand.

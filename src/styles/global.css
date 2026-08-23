@@ -2092,8 +2092,33 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
   letter-spacing: normal;
 }
 
-/* A one-character answer, so the column can be read straight down. */
+/* A one-character answer, so the column can be read straight down — but the
+   heading is spelled out wherever it fits. "OFF" reads as off/on, which was the
+   first question anyone asked of this table. */
 .cat-table .c-off { width: 1%; text-align: center; }
+.cat-table .c-off-abbr { display: none; }
+@media (max-width: 780px) {
+  .cat-table .c-off-full { display: none; }
+  .cat-table .c-off-abbr { display: inline; }
+}
+
+.cat-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: var(--text-mute);
+}
+.cat-legend strong { color: var(--text-dim); font-weight: 650; }
+.cat-legend .legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.cat-legend-lead { margin-right: 2px; }
 .off-flag {
   display: inline-grid;
   place-items: center;

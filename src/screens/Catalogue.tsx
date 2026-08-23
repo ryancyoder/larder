@@ -119,6 +119,21 @@ export default function Catalogue() {
               </label>
             </div>
 
+            {/* A legend, not a tooltip: the table is read on a touch screen where
+                there is nothing to hover, and the dash needs saying out loud —
+                it is an unasked question, not a negative answer. */}
+            <p className="cat-legend">
+              <span className="cat-legend-lead">
+                <strong>Open Food Facts</strong> is the free product database barcodes are
+                looked up in.
+              </span>
+              {/* Each flag stays glued to its meaning — wrapping between them
+                  leaves a bare dash at the end of a line explaining nothing. */}
+              <span className="legend-item"><span className="off-flag off-yes">Y</span> it's listed</span>
+              <span className="legend-item"><span className="off-flag off-no">N</span> it isn't</span>
+              <span className="legend-item"><span className="off-flag off-unknown">—</span> not scanned yet, so never asked</span>
+            </p>
+
             {view === 'unscanned' && counts.unscanned > 0 && (
               <p style={{ fontSize: 12, color: 'var(--text-mute)', marginTop: 8 }}>
                 These came off a receipt and have never been matched to a real barcode, so they
@@ -137,9 +152,13 @@ export default function Catalogue() {
                     <th className="k-cat">Category</th>
                     <th className="c-sku">SKU</th>
                     <th className="c-barcode">Barcode</th>
-                    {/* Not "in Open Food Facts?" — the column is read down, and a
-                        one-character answer is what makes that scannable. */}
-                    <th className="c-off" title="Is this product in Open Food Facts?">OFF</th>
+                    {/* Written out wherever there is room. "OFF" saves space and
+                        costs comprehension — it reads as off/on, which is the
+                        first thing anyone asked about this table. */}
+                    <th className="c-off" title="Is this product listed in Open Food Facts?">
+                      <span className="c-off-full">Open Food Facts</span>
+                      <span className="c-off-abbr">OFF</span>
+                    </th>
                     <th className="c-bought">Bought</th>
                     <th className="k-qty">Last paid</th>
                   </tr>
