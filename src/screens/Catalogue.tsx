@@ -1,11 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import type { Product } from '../db/schema'
 import { useProducts } from '../app/data'
 import { categoryMeta } from '../lib/categories'
 import { foodMeta } from '../lib/foods'
 import { formatDate } from '../lib/dates'
-import { offLabel, searchProducts } from '../lib/products'
+import { offLabel, searchProducts, sweepOpenFoodFacts, type SweepProgress } from '../lib/products'
 import { CatDot, Empty, Seg } from '../components/ui'
+import { useToast } from '../app/toast'
 
 /**
  * The master catalogue — every distinct product this household buys.
@@ -40,9 +41,12 @@ function compare(a: Product, b: Product, key: SortKey): number {
 
 export default function Catalogue() {
   const products = useProducts()
+  const toast = useToast()
   const [view, setView] = useState<View>('all')
   const [sort, setSort] = useState<SortKey>('bought')
   const [query, setQuery] = useState('')
+  const [sweep, setSweep] = useState<SweepProgress | null>(null)
+  const cancelRef = useRef({ cancelled: false })
 
   const counts = useMemo(() => {
     const all = products ?? []
@@ -51,6 +55,11 @@ export default function Catalogue() {
       unscanned: all.filter((p) => !p.barcode).length,
       scanned: all.filter((p) => p.barcode).length,
       known: all.filter((p) => p.offStatus === 'found').length,
+      // Barcodes nobody has put to Open Food Facts yet. Not zero by default:
+      // `off_status` arrived after the scanning did, so every code learned
+      // before it exists with no answer recorded against it.
+      unchecked: all.filter((p) => p.barcode && !p.offStatus).length,
+      missing: all.filter((p) => p.offStatus === 'missing').length,
     }
   }, [products])
 
@@ -63,6 +72,27 @@ export default function Catalogue() {
         : all
     return searchProducts(scoped, query).sort((a, b) => compare(a, b, sort))
   }, [products, view, query, sort])
+
+  async function runSweep(recheckMissing: boolean) {
+    cancelRef.current = { cancelled: false }
+    setSweep({ done: 0, total: 0, found: 0, missing: 0 })
+    try {
+      const result = await sweepOpenFoodFacts(products ?? [], {
+        recheckMissing,
+        onProgress: setSweep,
+        signal: cancelRef.current,
+      })
+      toast(
+        cancelRef.current.cancelled
+          ? `Stopped after ${result.done} — the rest keep their barcodes`
+          : `${result.found} listed · ${result.missing} not in Open Food Facts`,
+      )
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Could not reach Open Food Facts.')
+    } finally {
+      setSweep(null)
+    }
+  }
 
   if (!products) return null
 
@@ -108,6 +138,20 @@ export default function Catalogue() {
                   { value: 'scanned' as View, label: `Scanned ${counts.scanned}` },
                 ]}
               />
+              {sweep ? (
+                <button className="btn sm" onClick={() => { cancelRef.current.cancelled = true }}>
+                  Checking {sweep.done}/{sweep.total || '…'} — stop
+                </button>
+              ) : counts.unchecked > 0 ? (
+                <button className="btn primary sm" onClick={() => runSweep(false)}>
+                  ✨ Check {counts.unchecked} against Open Food Facts
+                </button>
+              ) : counts.missing > 0 ? (
+                <button className="btn sm" onClick={() => runSweep(true)} title="Open Food Facts grows; a barcode it did not know last month may be listed now">
+                  ↻ Re-check the {counts.missing} it didn't know
+                </button>
+              ) : null}
+
               <label className="field" style={{ flex: 'none', minWidth: 130 }}>
                 <span>Sort</span>
                 <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
@@ -122,6 +166,21 @@ export default function Catalogue() {
             {/* A legend, not a tooltip: the table is read on a touch screen where
                 there is nothing to hover, and the dash needs saying out loud —
                 it is an unasked question, not a negative answer. */}
+            {counts.unchecked > 0 && !sweep && (
+              <p style={{ fontSize: 12, color: 'var(--text-mute)', marginTop: 8 }}>
+                {counts.unchecked} of your barcodes have never been put to Open Food Facts, so
+                their answer is blank rather than negative. Run the check once and the column
+                fills in; every scan from here records it as it goes.
+              </p>
+            )}
+
+            {sweep && (
+              <p style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 8 }}>
+                {sweep.current ? `Looking up ${sweep.current}…` : 'Starting…'}
+                {sweep.done > 0 && ` · ${sweep.found} listed, ${sweep.missing} not`}
+              </p>
+            )}
+
             <p className="cat-legend">
               <span className="cat-legend-lead">
                 <strong>Open Food Facts</strong> is the free product database barcodes are
