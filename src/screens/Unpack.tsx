@@ -8,6 +8,9 @@ import { scanningAvailable } from '../lib/barcode'
 import BarcodeScanner from '../components/BarcodeScanner'
 import RapidScan from './RapidScan'
 import ReceiptImport from './ReceiptImport'
+import TripScan from './TripScan'
+import { useTrips } from '../app/data'
+import type { Trip } from '../db/schema'
 import { loadPhotoBlob } from '../lib/photos'
 import { identifyPhoto, AIError } from '../lib/ai'
 import { getSetting } from '../db/db'
@@ -25,7 +28,9 @@ import { useToast } from '../app/toast'
 export default function Unpack({ onClose }: { onClose: () => void }) {
   const [rapid, setRapid] = useState(false)
   const [receipt, setReceipt] = useState(false)
+  const [tripScan, setTripScan] = useState<Trip | null>(null)
   const rows = useInbox()
+  const trips = useTrips()
   const places = usePlaces() ?? []
   const cats = useCategories() ?? []
   const toast = useToast()
@@ -38,6 +43,22 @@ export default function Unpack({ onClose }: { onClose: () => void }) {
 
   const pending = rows ?? []
   const unnamed = pending.filter((r) => !r.name?.trim())
+
+  /**
+   * Shops with rows still waiting on a barcode, biggest first.
+   *
+   * Offered as a session rather than as tiles because the tiles are the slow
+   * path this exists to replace: 72 rows from one receipt is 72 dialogs, and
+   * the receipt already knows everything about them except which packet is
+   * which.
+   */
+  const waitingTrips = (trips ?? [])
+    .map((trip) => ({
+      trip,
+      waiting: pending.filter((r) => r.tripId === trip.id && !r.barcode).length,
+    }))
+    .filter((t) => t.waiting > 0)
+    .sort((a, b) => b.waiting - a.waiting)
 
   async function onFiles(files: FileList | null) {
     if (!files?.length) return
@@ -171,6 +192,28 @@ export default function Unpack({ onClose }: { onClose: () => void }) {
         <p style={{ padding: '0 14px', fontSize: 12.5, color: 'var(--danger)' }}>{error}</p>
       )}
 
+      {waitingTrips.map(({ trip, waiting }) => (
+        <div key={trip.id} className="card card-pad" style={{ margin: '0 14px 8px' }}>
+          <div className="row" style={{ gap: 10, alignItems: 'center' }}>
+            <span style={{ fontSize: 20, flex: 'none' }}>🧾</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 650, fontSize: 14 }}>
+                {waiting} from {trip.store} need a barcode
+              </div>
+              <div style={{ fontSize: 11.5, color: 'var(--text-mute)' }}>
+                One session, camera on, no tapping between items — scan each packet once and
+                every future receipt from there knows it.
+              </div>
+            </div>
+            {scanningAvailable() && (
+              <button className="btn primary sm" style={{ flex: 'none' }} onClick={() => setTripScan(trip)}>
+                ⚡ Scan them
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
+
       <div className="pos-grid">
         {pending.length === 0 ? (
           <p className="pos-empty">
@@ -209,6 +252,7 @@ export default function Unpack({ onClose }: { onClose: () => void }) {
 
       {rapid && <RapidScan onClose={() => setRapid(false)} />}
       {receipt && <ReceiptImport onClose={() => setReceipt(false)} />}
+      {tripScan && <TripScan trip={tripScan} onClose={() => setTripScan(null)} />}
     </div>
   )
 
