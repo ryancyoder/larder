@@ -178,15 +178,59 @@ TOTAL                                 6.93
 
   check('line count', r.lines.length, 3)
   check('names', r.lines.map((l) => l.description), [
-    'Gallon Milk',
+    'Milk',
     'Bananas',
     'Great Value Shredded Cheddar',
   ])
+  // A size written at the front belongs in the size fields, not the name.
+  // Dropping the number and stranding the unit is what produced a real shelf
+  // full of "oz Pasta Sauce".
+  check('leading size is read', [r.lines[0].size, r.lines[0].sizeUnit], [1, 'gal'])
   // The regression this guards: the weight line used to attach to the milk.
   check('milk is one unit', r.lines[0].qty, 1)
   check('bananas carry their weight', r.lines[1].qty, 2.14)
   check('sold by the pound', r.lines[1].unit, 'lb')
   check('bananas price is the line total', r.lines[1].price, 1.26)
+})
+
+describe('Regressions from a real 73-line ALDI import', () => {
+  const r = parseReceipt(`ALDI
+  385110 24 oz Pasta Sauce        1.69 FA
+  385110 24 oz Pasta Sauce        1.69 FA
+  365403 Chicken Pot Pie          0.99 FA
+  365403 Chicken Pot Pie          0.99 FA
+  399568 1lb Ham Lunchmeat        5.89 FA
+  383041 Large Organic ACV        4.99 NC
+TOTAL                            16.24
+`)
+
+  // Was "oz Pasta Sauce": the 24 was discarded as a code fragment and the unit
+  // left stranded on the front of the name.
+  check('leading size leaves the name', r.lines[0].description, 'Pasta Sauce')
+  check('and lands in the size fields', [r.lines[0].size, r.lines[0].sizeUnit], [24, 'oz'])
+  check('no space needed', r.lines[2].description, 'Ham Lunchmeat')
+  check('unspaced size read too', [r.lines[2].size, r.lines[2].sizeUnit], [1, 'lb'])
+  // Four rows on the paper, two on the shelf.
+  check('repeats fold', r.lines.length, 4)
+  check('as quantities', r.lines.map((l) => l.qty), [2, 2, 1, 1])
+  check('with prices summed', r.lines[0].price, 3.38)
+  // A name with no size is left entirely alone.
+  check('untouched', r.lines[3].description, 'Large Organic ACV')
+})
+
+describe('A photographed receipt folds repeats like a pasted one', () => {
+  // The bug this guards: receiptFromScan skipped foldRepeats, so the same shop
+  // imported differently depending on whether it was pasted or photographed.
+  const r = receiptFromScan({
+    store: 'ALDI',
+    lines: [
+      { barcode: '365403', description: 'Chicken Pot Pie', qty: 1, price: 0.99 },
+      { barcode: '365403', description: 'Chicken Pot Pie', qty: 1, price: 0.99 },
+    ],
+  })
+  check('one row', r.lines.length, 1)
+  check('of two', r.lines[0].qty, 2)
+  check('priced together', r.lines[0].price, 1.98)
 })
 
 describe('Costco — a decorated total, and a coupon against an item number', () => {

@@ -200,6 +200,44 @@ const SHORTHAND: Record<string, string> = {
   ORGNC: 'Organic', SHREDS: 'Shredded', RSTD: 'Roasted', SNDWCH: 'Sandwich',
 }
 
+/**
+ * Units as they appear in a *leading* size — "24 oz Pasta Sauce", "1 GALLON
+ * MILK". Spelled-out words live here and not in the suffix table because a till
+ * writing the size at the front has the room to write it out.
+ */
+const LEADING_SIZE_UNITS: Array<[RegExp, Unit]> = [
+  [/^(fl\.?\s?oz|floz|fz)$/i, 'floz'],
+  [/^(oz|z|ounces?)$/i, 'oz'],
+  [/^(lb|lbs|pounds?|#)$/i, 'lb'],
+  [/^(kg|kilograms?)$/i, 'kg'],
+  [/^(g|gm|gr|grams?)$/i, 'g'],
+  [/^(ml|millilit(?:re|er)s?)$/i, 'ml'],
+  [/^(l|ltr|lt|lit(?:re|er)s?)$/i, 'l'],
+  [/^(gal|gallons?)$/i, 'gal'],
+  [/^(qt|quarts?)$/i, 'qt'],
+  [/^(ct|count|pc|pcs|pk|pack|ea)$/i, 'ea'],
+]
+
+/**
+ * "24 oz Pasta Sauce" → 24 oz of "Pasta Sauce".
+ *
+ * Without this the number is dropped as a code fragment and the unit is left
+ * stranded on the front of the name, which is how a real import produced a
+ * shelf full of "oz Pasta Sauce".
+ */
+function readLeadingSize(text: string): { size?: number; sizeUnit?: Unit; rest: string } {
+  const match = text.match(/^\s*(\d+(?:\.\d+)?)\s*-?\s*([a-z.]{1,12})\s+(?=\S)/i)
+  if (!match) return { rest: text }
+  const value = Number(match[1])
+  if (!Number.isFinite(value) || value <= 0) return { rest: text }
+  for (const [pattern, unit] of LEADING_SIZE_UNITS) {
+    if (pattern.test(match[2])) {
+      return { size: value, sizeUnit: unit, rest: text.slice(match[0].length) }
+    }
+  }
+  return { rest: text }
+}
+
 /** Size suffixes as a till writes them: "8Z", "64FLOZ", "2LB", "12CT". */
 const SIZE_UNITS: Array<[RegExp, Unit]> = [
   [/^(fl\.?oz|floz|fz)$/i, 'floz'],
@@ -347,8 +385,9 @@ export function expandDescription(raw: string): string {
       const bare = word.replace(/[^A-Za-z0-9']/g, '')
       const known = SHORTHAND[bare.toUpperCase()]
       if (known) return known
-      // A bare number left in the middle of a name is a code fragment, not a word.
-      if (/^\d+$/.test(bare)) return ''
+      // A long bare number is a leftover code fragment. A short one is a real
+      // part of the name — "3 Musketeers", "7 Up" — so only the long ones go.
+      if (/^\d{4,}$/.test(bare)) return ''
       if (!shouting) return bare
       return bare.toLowerCase().replace(/^[a-z]/, (c) => c.toUpperCase())
     })
@@ -437,7 +476,12 @@ function buildLine(parts: {
   price: number
 }): ReceiptLine {
   const { sku, rest: unnumbered } = findStoreCode(parts.text)
-  const { size, sizeUnit, rest } = readSize(unnumbered)
+  const trailing = readSize(unnumbered)
+  // Trailing wins: "8Z" at the end is unambiguously a pack size, where a
+  // leading number could still be a quantity column.
+  const { size, sizeUnit, rest } = trailing.size != null
+    ? trailing
+    : readLeadingSize(trailing.rest)
   const rawDescription = rest.replace(/\s+/g, ' ').trim()
   const description = expandDescription(rawDescription)
   const kind: LineKind = parts.price < 0 ? 'discount' : 'item'
@@ -707,7 +751,11 @@ export function receiptFromScan(scan: ScannedReceipt): ParsedReceipt {
   return {
     store: scan.store?.trim() || undefined,
     date: scan.date?.trim() || undefined,
-    lines,
+    // Folded here too. Leaving it out of this route was a real bug: a
+    // photographed receipt put two rows of "Chicken Pot Pie" on the shelf where
+    // the pasted one put a single row of two, so the same shop imported
+    // differently depending on how it was read.
+    lines: foldRepeats(lines),
     printedTotal: scan.printedTotal ? scan.printedTotal : undefined,
     ignored: 0,
   }

@@ -237,9 +237,33 @@ Repeat lines fold: a till prints one line per scan, so two identical salamis are
 two rather than two rows on the shelf. Matched on the till's own text and the unit price,
 never the expanded name.
 
+#### Scanning a shop against its receipt — `src/lib/tripScan.ts` + `src/screens/TripScan.tsx`
+
+Unpack shows a banner per shop still waiting on barcodes: **"72 from ALDI need a barcode ·
+⚡ Scan them"**. One session, camera live, no tapping between items.
+
+This is the inverse of `rapid.ts` and that is the whole design. In the rapid scanner a scan
+*creates* a line. Here the list is fixed and known in advance — the receipt already said
+what was bought and what it cost — so a scan **claims** a line, and the only interesting
+question is which one.
+
+- **Ordinarily the cursor decides.** The screen names the row it wants next; you scan that
+  packet. Unknown barcodes are the norm at ALDI, so this is the common path.
+- **A recognised name overrides it.** When Open Food Facts knows the code and the name
+  matches some *other* pending row above `MATCH_THRESHOLD`, the scan moves there — the
+  packet in your hand beats the cursor, which is what makes it safe to unpack in any order.
+- **Matching is token overlap, not edit distance.** A till writes `FrzFineGreenBeans` and
+  the database says "Fine Green Beans, Frozen": every word shared, almost no character
+  positions. `tokens()` splits on case boundaries first, which is the only reason the real
+  ALDI lines are recognisable at all — without it that name is one token matching nothing.
+- **Barcodes are written the instant they land; items are confirmed only at the end.** So
+  closing halfway keeps everything learned, leaves the rest parked, and reopening resumes.
+- The frozen `pending` list is deliberate: `useInbox` is live and each scan rewrites a row,
+  so a list derived straight from it would reshuffle under the camera mid-session.
+
 #### The tests
 
-`npm run test:receipt` — 50 assertions over six layouts (ALDI, Walmart, Kroger, Costco,
+`npm test` runs both suites. `npm run test:receipt` — assertions over six layouts (ALDI, Walmart, Kroger, Costco,
 Sam's Club, Target) plus the photo route. **These were kept**, unlike the throwaway
 `rapid.ts` tests. When a receipt reads wrong, paste it in as a new case, watch it fail, fix
 the parser, and check the others still pass. No test framework: the parser is pure, so a
@@ -380,8 +404,8 @@ trigger *and* revisit the join screen.
   the beep is silent the audio unlock needs moving to the button press.
 - **Kitchen header buttons overflow** off the right edge on a narrow phone
   (Unpack / Tiles / Select / Settings). Pre-existing; noticed, not fixed.
-- No test suite beyond `npm run test:receipt`. The `rapid.ts` tests were throwaway; the
-  receipt ones were not.
+- No test suite beyond `npm test` (`test:receipt` + `test:tripscan`). The `rapid.ts` tests
+  were throwaway; these were not.
 
 ---
 
