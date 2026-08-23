@@ -2,7 +2,7 @@ import { db } from '../db/db'
 import type { Category, Item, Nutrition, Product, Unit } from '../db/schema'
 import { guessCategory } from './categories'
 import { matchFood } from './foods'
-import { lookupBarcode } from './openfoodfacts'
+import { importProductPhoto, lookupBarcode } from './openfoodfacts'
 import { todayISO } from './dates'
 import { unitPrice } from './inventory'
 
@@ -180,6 +180,12 @@ export async function learnBarcode(
       patch.size = found.qty
       patch.sizeUnit = found.unit
     }
+    // The product shot, fetched once and re-encoded locally. Failing to get a
+    // picture must never fail the scan — the barcode is the point.
+    if (product.photoId == null && found.imageUrl) {
+      const photoId = await importProductPhoto(found).catch(() => undefined)
+      if (photoId != null) patch.photoId = photoId
+    }
   }
 
   await db.products.update(productId, patch)
@@ -254,6 +260,10 @@ export async function sweepOpenFoodFacts(
       if (!product.foodKey) {
         const food = matchFood(found.name, found.brand)
         if (food) patch.foodKey = food
+      }
+      if (product.photoId == null && found.imageUrl) {
+        const photoId = await importProductPhoto(found).catch(() => undefined)
+        if (photoId != null) patch.photoId = photoId
       }
     } else {
       state.missing++

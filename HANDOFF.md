@@ -83,8 +83,14 @@ The complaint that motivated this table was really about duplicates, not disappe
 - `lib/products.ts` holds the logic: `productByCode`, `upsertProduct` (fills gaps, never
   overwrites — a name from a person or from Open Food Facts beats a till abbreviation, and
   re-importing an old receipt must not undo either), `learnBarcode`, `recordPurchase`.
-- **The Catalog tab** browses it — Product / Category / SKU / Barcode / Open Food Facts /
-  Size, with filters for *To scan* and *Scanned*.
+- **The Catalog tab** browses it — Picture / Product / Food / Category / SKU / Barcode /
+  Open Food Facts / Size / Price each, with filters for *To scan* and *Scanned*.
+  **Every heading sorts**, and clicking the sorted one reverses it. Each key opens in the
+  direction that reads best (names A–Z, prices dearest first), and the name breaks every tie
+  so the order is stable.
+  **Product photos** come from Open Food Facts. `importProductPhoto()` had existed unused
+  since before the catalogue did; `learnBarcode` and the sweep now both call it, so pictures
+  arrive as products are scanned or when the sweep is run.
 
   **The catalogue holds identity, never quantity.** `times_bought`, `last_bought_at` and
   `last_price` lived here briefly and were dropped in `0007`. Each duplicated something
@@ -502,6 +508,14 @@ trigger *and* revisit the join screen.
 
 - **`npm run build` typechecks**, so run it before committing — it catches what a dev
   server won't.
+- **The harness must set `data-layout`.** `.main` is capped at 780px and only widens to
+  1180px under `:root[data-layout='wide']`, which the app stamps from the viewport. A
+  harness that omits it measures the *compact* layout at a wide viewport and reports the
+  wrong answer — and because the wide layout is a `216px 1fr` grid, the harness needs the
+  `<nav>` too or `.main` lands in the rail slot and comes back 216px wide. Both of those
+  produced confident, wrong measurements before being caught. The numbers that matter:
+  **a 1180px iPad gives the table 964px**, a 1024px one gives 808px. Set the catalogue's
+  breakpoints from that, not from device widths.
 - **The static-harness trick works, and now has a script.** The catalogue table was checked
   before shipping by copying the built `dist/assets/index-*.css` beside a hand-written HTML
   page of real markup and screenshotting it in Chromium at 1180×820 and 390×844 —
