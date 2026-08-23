@@ -2113,11 +2113,19 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
 /* The product shot. A fixed square so a column of them lines up, and the
    category emoji stands in until a picture is fetched. */
 .cat-table .c-pic { width: 1%; padding-right: 8px; }
-.cat-table .c-food {
+.cat-table .c-food,
+.cat-table .c-brand {
   white-space: nowrap;
   font-size: 12.5px;
   color: var(--text-dim);
   width: 1%;
+}
+/* A brand can be long — "Countryside Creamery" — and is the least essential
+   thing on the row, so it gives way rather than pushing the codes off. */
+.cat-table .c-brand {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .cat-table .muted {
@@ -2179,15 +2187,23 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
    iPad gives the table 964px and a 1000px window gives it 784px. The
    breakpoints are set from measuring that, not from guessing at device sizes.
    Columns go in order of how much each earns its width. */
-@media (max-width: 1150px) {
+/* 1180px is the landscape iPad exactly, so every breakpoint sits below it —
+   a `max-width: 1180px` rule would fire on the one device this is built for. */
+/* Ten columns need about 1040px of table; a landscape iPad gives 964, so one
+   has to go even there. Category is the one: Food already says what a thing is,
+   and the category is still on the row as the coloured dot beside the picture.
+   Measured, not guessed — every figure here came from the harness in §8. */
+@media (max-width: 1250px) {
+  .cat-table .k-cat { display: none; }
+}
+@media (max-width: 1050px) {
+  .cat-table .c-brand { display: none; }
+}
+@media (max-width: 1000px) {
   .cat-table .c-size { display: none; }
 }
-@media (max-width: 1080px) {
+@media (max-width: 880px) {
   .cat-table .c-food { display: none; }
-}
-@media (max-width: 940px) {
-  /* Food already says what it is; the category is the coarser of the two. */
-  .cat-table .k-cat { display: none; }
 }
 @media (max-width: 620px) {
   /* Down to what a phone can hold: the picture, what it is, its code, whether
