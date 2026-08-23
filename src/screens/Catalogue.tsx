@@ -42,7 +42,7 @@ type View = 'all' | 'unscanned' | 'scanned'
  * Each key carries the direction it should open in, because "sensible first" is
  * not one answer for every column: names read A–Z, prices read dearest first.
  */
-type SortKey = 'photo' | 'name' | 'food' | 'category' | 'sku' | 'barcode' | 'off' | 'size' | 'price'
+type SortKey = 'photo' | 'name' | 'brand' | 'food' | 'category' | 'sku' | 'barcode' | 'off' | 'size' | 'price'
 type Dir = 'asc' | 'desc'
 
 const OPENS_DESC: SortKey[] = ['price', 'size', 'photo']
@@ -64,6 +64,7 @@ function offRank(p: Product): number {
 function value(p: Product, key: SortKey, paid: Map<number, LastPaid>): string | number {
   switch (key) {
     case 'photo': return p.photoId != null ? 1 : 0
+    case 'brand': return p.brand?.toLowerCase() ?? LAST
     case 'food': return foodMeta(p.foodKey)?.name.toLowerCase() ?? LAST
     case 'category': return p.category
     case 'sku': return p.sku ?? LAST
@@ -268,6 +269,7 @@ export default function Catalogue() {
                     <SortTh sort={sort} onSort={toggle} col="name" className="k-name" label="Product" />
                     {/* The basic food, not the product: fresh, canned and frozen
                         beets are three products and one food. See lib/foods.ts. */}
+                    <SortTh sort={sort} onSort={toggle} col="brand" className="c-brand" label="Brand" />
                     <SortTh sort={sort} onSort={toggle} col="food" className="c-food" label="Food" />
                     <SortTh sort={sort} onSort={toggle} col="category" className="k-cat" label="Category" />
                     <SortTh sort={sort} onSort={toggle} col="sku" className="c-sku" label="SKU" />
@@ -366,7 +368,10 @@ function Row({ product, paid }: { product: Product; paid?: LastPaid }) {
 
       <td className="k-name">
         <span className="nm">{product.name}</span>
-        {product.brand && <span className="chip">{product.brand}</span>}
+      </td>
+
+      <td className="c-brand">
+        {product.brand ?? <span className="muted">—</span>}
       </td>
 
       <td className="c-food">

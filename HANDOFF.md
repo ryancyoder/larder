@@ -83,8 +83,12 @@ The complaint that motivated this table was really about duplicates, not disappe
 - `lib/products.ts` holds the logic: `productByCode`, `upsertProduct` (fills gaps, never
   overwrites — a name from a person or from Open Food Facts beats a till abbreviation, and
   re-importing an old receipt must not undo either), `learnBarcode`, `recordPurchase`.
-- **The Catalog tab** browses it — Picture / Product / Food / Category / SKU / Barcode /
-  Open Food Facts / Size / Price each, with filters for *To scan* and *Scanned*.
+- **The Catalog tab** browses it — Picture / Product / Brand / Food / Category / SKU /
+  Barcode / Open Food Facts / Size / Price each, with filters for *To scan* and *Scanned*.
+  Ten columns need ~1040px of table and a landscape iPad gives 964, so **Category is hidden
+  below 1250px** — Food already says what a thing is, and the category survives as the
+  coloured dot beside the picture. Every breakpoint sits *below* 1180 rather than at it: a
+  `max-width: 1180px` rule fires on the exact device this is built for.
   **Every heading sorts**, and clicking the sorted one reverses it. Each key opens in the
   direction that reads best (names A–Z, prices dearest first), and the name breaks every tie
   so the order is stable.
