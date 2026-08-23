@@ -276,6 +276,16 @@ catalogue, and the interesting part is what changed — so `recogniseLines()` ma
 line by till code before anything is committed and the review screen says, per line,
 whether it has been seen before and whether it costs more than last time.
 
+- **Every price on screen is the price of one.** A line total is a quantity in disguise:
+  "$5.98" for two salamis compares against nothing, where "$2.99 each" compares against next
+  month. The receipt review, the trip sheet and the catalog all lead with the unit price and
+  show the line total underneath only when the quantity is more than one.
+  **`Item.price` is still stored as the line total**, deliberately — it is what was actually
+  spent, and `ledger_events.value` needs that figure to make spend tracking mean anything.
+  `unitPrice(item)` divides. The distinction is storage versus display, not a disagreement.
+- **The catalog shows a *Price each* column**, derived from stock by `lastPaidByProduct()`
+  rather than stored on the product — the identity rule stands, and a price still belongs to
+  a purchase.
 - **Prices are compared per unit, never per line.** Two jars at $5.18 and one at $2.59 are
   the same price; comparing line totals would cry inflation every time somebody bought a
   spare.

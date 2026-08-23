@@ -1,9 +1,12 @@
 import { useMemo, useRef, useState } from 'react'
 import type { Product } from '../db/schema'
-import { useProducts } from '../app/data'
+import { useAllStock, useProducts } from '../app/data'
 import { categoryMeta } from '../lib/categories'
 import { foodMeta } from '../lib/foods'
-import { offLabel, searchProducts, sweepOpenFoodFacts, type SweepProgress } from '../lib/products'
+import {
+  lastPaidByProduct, offLabel, searchProducts, sweepOpenFoodFacts,
+  type LastPaid, type SweepProgress,
+} from '../lib/products'
 import { CatDot, Empty, Seg } from '../components/ui'
 import { useToast } from '../app/toast'
 
@@ -33,18 +36,27 @@ type View = 'all' | 'unscanned' | 'scanned'
  * on purpose. Those are facts about purchases, and Trips and Insights answer
  * them from the record that owns them.
  */
-type SortKey = 'name' | 'sku' | 'category'
+type SortKey = 'name' | 'sku' | 'category' | 'price'
 
-function compare(a: Product, b: Product, key: SortKey): number {
+function compare(
+  a: Product, b: Product, key: SortKey, paid: Map<number, LastPaid>,
+): number {
   switch (key) {
     case 'sku': return (a.sku ?? '\uffff').localeCompare(b.sku ?? '\uffff') || a.name.localeCompare(b.name)
     case 'category': return a.category.localeCompare(b.category) || a.name.localeCompare(b.name)
+    case 'price': {
+      // Dearest first, and anything never bought sorts last rather than as free.
+      const pa = a.id != null ? paid.get(a.id)?.unitPrice : undefined
+      const pb = b.id != null ? paid.get(b.id)?.unitPrice : undefined
+      return (pb ?? -1) - (pa ?? -1) || a.name.localeCompare(b.name)
+    }
     default: return a.name.localeCompare(b.name)
   }
 }
 
 export default function Catalogue() {
   const products = useProducts()
+  const stock = useAllStock()
   const toast = useToast()
   const [view, setView] = useState<View>('all')
   const [sort, setSort] = useState<SortKey>('name')
@@ -67,6 +79,16 @@ export default function Catalogue() {
     }
   }, [products])
 
+  /**
+   * What each product cost per unit last time, worked out from stock.
+   *
+   * Derived, never stored: the catalogue holds identity, and a price belongs to
+   * a purchase. Per unit rather than per line, because a line total is a
+   * quantity in disguise — two salamis at $5.98 tells you nothing you can
+   * compare against next month's single one.
+   */
+  const paid = useMemo(() => lastPaidByProduct(stock ?? []), [stock])
+
   const rows = useMemo(() => {
     const all = products ?? []
     const scoped = view === 'unscanned'
@@ -74,8 +96,8 @@ export default function Catalogue() {
       : view === 'scanned'
         ? all.filter((p) => p.barcode)
         : all
-    return searchProducts(scoped, query).sort((a, b) => compare(a, b, sort))
-  }, [products, view, query, sort])
+    return searchProducts(scoped, query).sort((a, b) => compare(a, b, sort, paid))
+  }, [products, view, query, sort, paid])
 
   async function runSweep(recheckMissing: boolean) {
     cancelRef.current = { cancelled: false }
@@ -162,6 +184,7 @@ export default function Catalogue() {
                   <option value="name">Name A–Z</option>
                   <option value="sku">Item number</option>
                   <option value="category">Category</option>
+                  <option value="price">Price each</option>
                 </select>
               </label>
             </div>
@@ -224,10 +247,19 @@ export default function Catalogue() {
                     {/* Pack size, not stock: what one of them contains. How many
                         you have is the Kitchen's question, not this table's. */}
                     <th className="c-size">Size</th>
+                    {/* What one costs, not what a line came to. A line total is a
+                        quantity in disguise and compares against nothing. */}
+                    <th className="k-qty">Price each</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((product) => <Row key={product.id} product={product} />)}
+                  {rows.map((product) => (
+                    <Row
+                      key={product.id}
+                      product={product}
+                      paid={product.id != null ? paid.get(product.id) : undefined}
+                    />
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -244,7 +276,9 @@ export default function Catalogue() {
   )
 }
 
-function Row({ product }: { product: Product }) {
+const money = (n: number) => `$${n.toFixed(2)}`
+
+function Row({ product, paid }: { product: Product; paid?: LastPaid }) {
   const meta = categoryMeta(product.category)
   const food = foodMeta(product.foodKey)
   const off = offLabel(product)
@@ -284,6 +318,10 @@ function Row({ product }: { product: Product }) {
         {product.size != null
           ? <span>{product.size}{product.sizeUnit ? ` ${product.sizeUnit}` : ''}</span>
           : <span className="muted">—</span>}
+      </td>
+
+      <td className="k-qty tabular">
+        {paid ? money(paid.unitPrice) : <span className="muted">—</span>}
       </td>
     </tr>
   )
