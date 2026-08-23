@@ -4,134 +4,209 @@ import { useProducts } from '../app/data'
 import { categoryMeta } from '../lib/categories'
 import { foodMeta } from '../lib/foods'
 import { formatDate } from '../lib/dates'
-import { searchProducts, sortProducts, unlearned } from '../lib/products'
-import { Seg, Sheet } from '../components/ui'
+import { offLabel, searchProducts } from '../lib/products'
+import { CatDot, Empty, Seg } from '../components/ui'
 
 /**
- * The product catalogue — every distinct thing this household buys.
+ * The master catalogue — every distinct product this household buys.
  *
  * Separate from the Kitchen, which is stock: what is on the shelf right now and
  * how much of it. This is identity, and it outlives the food. Running out of
- * hummus does not make you stop being a household that buys hummus, and the
- * next receipt saying 343825 needs somewhere that remembers what that is.
+ * hummus does not stop you being a household that buys hummus, and the next
+ * receipt saying 343825 needs somewhere that remembers what that is.
  *
- * The *Needs a scan* filter is the working list: those are the products whose
- * till code has never been tied to a real barcode, so they arrive named by an
- * abbreviation every single time until somebody scans one.
+ * Built as a table because the questions asked of it are comparisons down a
+ * column — which of these have I scanned, which does Open Food Facts know,
+ * what do I buy most — and aligned columns answer those far faster than a
+ * paragraph per row. Laid out for a landscape iPad, which is where a catalogue
+ * of several hundred products is actually readable; a phone drops the columns
+ * it cannot fit rather than shrinking all of them past legibility.
  */
 
-type View = 'all' | 'unscanned'
+type View = 'all' | 'unscanned' | 'scanned'
+type SortKey = 'bought' | 'name' | 'sku' | 'price'
 
-export default function Catalogue({ onClose }: { onClose: () => void }) {
+const money = (n: number) => `$${n.toFixed(2)}`
+
+function compare(a: Product, b: Product, key: SortKey): number {
+  switch (key) {
+    case 'name': return a.name.localeCompare(b.name)
+    case 'sku': return (a.sku ?? '').localeCompare(b.sku ?? '') || a.name.localeCompare(b.name)
+    case 'price': return (b.lastPrice ?? -1) - (a.lastPrice ?? -1) || a.name.localeCompare(b.name)
+    // Most-bought first: a catalogue's useful default is what you actually eat.
+    default: return b.timesBought - a.timesBought || a.name.localeCompare(b.name)
+  }
+}
+
+export default function Catalogue() {
   const products = useProducts()
   const [view, setView] = useState<View>('all')
+  const [sort, setSort] = useState<SortKey>('bought')
   const [query, setQuery] = useState('')
+
+  const counts = useMemo(() => {
+    const all = products ?? []
+    return {
+      all: all.length,
+      unscanned: all.filter((p) => !p.barcode).length,
+      scanned: all.filter((p) => p.barcode).length,
+      known: all.filter((p) => p.offStatus === 'found').length,
+    }
+  }, [products])
 
   const rows = useMemo(() => {
     const all = products ?? []
-    const scoped = view === 'unscanned' ? unlearned(all) : sortProducts(all)
-    return searchProducts(scoped, query)
-  }, [products, view, query])
+    const scoped = view === 'unscanned'
+      ? all.filter((p) => !p.barcode)
+      : view === 'scanned'
+        ? all.filter((p) => p.barcode)
+        : all
+    return searchProducts(scoped, query).sort((a, b) => compare(a, b, sort))
+  }, [products, view, query, sort])
 
-  const waiting = useMemo(() => unlearned(products ?? []).length, [products])
+  if (!products) return null
 
   return (
-    <Sheet title="Everything you buy" onClose={onClose}>
-      {products === undefined ? (
-        <p style={{ fontSize: 13, color: 'var(--text-mute)', padding: '18px 0', textAlign: 'center' }}>
-          Loading…
-        </p>
-      ) : products.length === 0 ? (
-        <p style={{ fontSize: 13, color: 'var(--text-mute)', padding: '18px 0' }}>
-          Nothing catalogued yet. Import a receipt or name something in Unpack and it starts
-          filling in — one entry per product, however many times you buy it.
-        </p>
+    <>
+      <div className="topbar">
+        <div>
+          <h1>Catalogue</h1>
+          <div className="sub">
+            {counts.all} product{counts.all === 1 ? '' : 's'}
+            {counts.unscanned > 0 && ` · ${counts.unscanned} never scanned`}
+            {counts.scanned > 0 && ` · ${counts.known} known to Open Food Facts`}
+          </div>
+        </div>
+      </div>
+
+      {counts.all === 0 ? (
+        <div className="section">
+          <Empty emoji="📇" title="Nothing catalogued yet">
+            Import a receipt or name something in Unpack and this fills in — one entry per
+            product, however many times you buy it.
+          </Empty>
+        </div>
       ) : (
         <>
-          <Seg
-            value={view}
-            onChange={setView}
-            options={[
-              { value: 'all' as View, label: `All ${products.length}` },
-              { value: 'unscanned' as View, label: `Needs a scan ${waiting}` },
-            ]}
-          />
-
-          <label className="field">
-            <span>Search</span>
-            <input
-              type="text"
-              value={query}
-              placeholder="Name, brand, item number or barcode"
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </label>
-
-          {view === 'unscanned' && (
-            <p style={{ fontSize: 12, color: 'var(--text-mute)', margin: 0 }}>
-              These arrived from a receipt and have never been matched to a real barcode, so
-              they come in wearing the till's abbreviation. Scan one from Unpack next time you
-              buy it and it is linked for good.
-            </p>
-          )}
-
-          {rows.length === 0 ? (
-            <p style={{ fontSize: 13, color: 'var(--text-mute)', padding: '14px 0', textAlign: 'center' }}>
-              Nothing matches that.
-            </p>
-          ) : (
-            <div className="stack" style={{ gap: 2 }}>
-              {rows.map((product) => <Row key={product.id} product={product} />)}
+          <section className="section">
+            <div className="row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <div className="search" style={{ flex: 1, minWidth: 180 }}>
+                <span className="icon">🔎</span>
+                <input
+                  type="text"
+                  placeholder="Name, brand, item number or barcode"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+              </div>
+              <Seg
+                value={view}
+                onChange={setView}
+                options={[
+                  { value: 'all' as View, label: `All ${counts.all}` },
+                  { value: 'unscanned' as View, label: `To scan ${counts.unscanned}` },
+                  { value: 'scanned' as View, label: `Scanned ${counts.scanned}` },
+                ]}
+              />
+              <label className="field" style={{ flex: 'none', minWidth: 130 }}>
+                <span>Sort</span>
+                <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
+                  <option value="bought">Bought most</option>
+                  <option value="name">Name A–Z</option>
+                  <option value="sku">Item number</option>
+                  <option value="price">Last price</option>
+                </select>
+              </label>
             </div>
-          )}
+
+            {view === 'unscanned' && counts.unscanned > 0 && (
+              <p style={{ fontSize: 12, color: 'var(--text-mute)', marginTop: 8 }}>
+                These came off a receipt and have never been matched to a real barcode, so they
+                still wear the till's abbreviation. Scan each once from Unpack and every future
+                receipt carrying that item number arrives already named.
+              </p>
+            )}
+          </section>
+
+          <section className="section">
+            <div className="ktable-wrap">
+              <table className="ktable cat-table">
+                <thead>
+                  <tr>
+                    <th className="k-name">Product</th>
+                    <th className="k-cat">Category</th>
+                    <th className="c-sku">SKU</th>
+                    <th className="c-barcode">Barcode</th>
+                    {/* Not "in Open Food Facts?" — the column is read down, and a
+                        one-character answer is what makes that scannable. */}
+                    <th className="c-off" title="Is this product in Open Food Facts?">OFF</th>
+                    <th className="c-bought">Bought</th>
+                    <th className="k-qty">Last paid</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((product) => <Row key={product.id} product={product} />)}
+                </tbody>
+              </table>
+            </div>
+
+            {rows.length === 0 && (
+              <p style={{ fontSize: 13, color: 'var(--text-mute)', padding: '18px 0', textAlign: 'center' }}>
+                Nothing matches that.
+              </p>
+            )}
+          </section>
         </>
       )}
-    </Sheet>
+    </>
   )
 }
 
 function Row({ product }: { product: Product }) {
   const meta = categoryMeta(product.category)
   const food = foodMeta(product.foodKey)
-
-  // Two identifiers, either of which may be missing, and the gap between them
-  // is the whole point of the screen.
-  const codes = [
-    product.sku ? `${product.store || 'store'} #${product.sku}` : '',
-    product.barcode ?? '',
-  ].filter(Boolean).join(' · ')
+  const off = offLabel(product)
 
   return (
-    <div className="row" style={{ gap: 8, alignItems: 'center', padding: '7px 0' }}>
-      <span style={{ fontSize: 17, flex: 'none' }}>{meta.emoji}</span>
+    <tr className={`krow${product.barcode ? '' : ' spent'}`}>
+      <td className="k-name">
+        <span className="nm">{product.name}</span>
+        {product.brand && <span className="chip">{product.brand}</span>}
+        {food && <span className="chip"><span className="dot" />{food.name}</span>}
+      </td>
 
-      <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>
-          {product.name}
-          {product.brand ? <span style={{ fontWeight: 400, color: 'var(--text-mute)' }}> · {product.brand}</span> : null}
-        </span>
-        <span style={{ fontSize: 11, color: 'var(--text-mute)' }}>
-          {codes || 'no codes yet'}
-          {food ? ` · ${food.name}` : ''}
-        </span>
-      </span>
+      <td className="k-cat">
+        <CatDot category={product.category} />
+        <span>{meta.label}</span>
+      </td>
 
-      <span style={{ flex: 'none', textAlign: 'right' }}>
-        {!product.barcode && (
-          <span
-            className="pos-flag warn"
-            title="Never scanned — its till code is not linked to a barcode"
-            style={{ fontSize: 11 }}
-          >
-            scan me
-          </span>
-        )}
-        <span style={{ display: 'block', fontSize: 11, color: 'var(--text-mute)', fontVariantNumeric: 'tabular-nums' }}>
-          {product.timesBought > 0
-            ? `bought ${product.timesBought}×${product.lastBoughtAt ? ` · ${formatDate(product.lastBoughtAt)}` : ''}`
-            : 'not bought yet'}
+      <td className="c-sku tabular">
+        {product.sku
+          ? <><span>{product.sku}</span>{product.store && <small>{product.store}</small>}</>
+          : <span className="muted">—</span>}
+      </td>
+
+      <td className="c-barcode tabular">
+        {product.barcode ?? <span className="muted">not scanned</span>}
+      </td>
+
+      <td className="c-off">
+        {/* Three states, and the dash is not a failure: nobody has scanned a
+            barcode yet, so the question has never been put. */}
+        <span className={`off-flag off-${off === 'Y' ? 'yes' : off === 'N' ? 'no' : 'unknown'}`}>
+          {off}
         </span>
-      </span>
-    </div>
+      </td>
+
+      <td className="c-bought tabular">
+        {product.timesBought > 0
+          ? <><span>{product.timesBought}×</span>{product.lastBoughtAt && <small>{formatDate(product.lastBoughtAt)}</small>}</>
+          : <span className="muted">—</span>}
+      </td>
+
+      <td className="k-qty tabular">
+        {product.lastPrice != null ? money(product.lastPrice) : <span className="muted">—</span>}
+      </td>
+    </tr>
   )
 }

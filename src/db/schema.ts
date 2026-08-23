@@ -209,6 +209,19 @@ export interface Product {
   sizeUnit?: Unit
   nutrition?: Nutrition
   photoId?: number
+  /**
+   * What Open Food Facts said, once somebody asked it.
+   *
+   * Three states, and the absent one carries meaning: undefined means nobody
+   * has scanned a barcode yet, so the question has never been put. `'missing'`
+   * is a settled answer, not outstanding work — at ALDI almost everything is
+   * own-brand and simply is not in the database.
+   *
+   * Recorded rather than inferred from `nutrition`, which is wrong both ways: a
+   * listed product may declare nothing worth storing, and nutrition can be
+   * typed in by hand.
+   */
+  offStatus?: 'found' | 'missing'
   timesBought: number
   lastBoughtAt?: string
   lastPrice?: number

@@ -120,6 +120,9 @@ export async function upsertProduct(draft: ProductDraft): Promise<Product> {
 
   const category = draft.category ?? guessCategory(draft.name)
   const row: Omit<Product, 'id'> = {
+    // A draft carrying a barcode came from a lookup that succeeded; one without
+    // has never been asked.
+    offStatus: barcode && draft.nutrition ? 'found' : undefined,
     name: draft.name.trim(),
     brand: draft.brand,
     barcode,
@@ -162,7 +165,9 @@ export async function learnBarcode(
 
   const found = await lookupBarcode(barcode).catch(() => null)
 
-  const patch: Partial<Product> = { barcode }
+  // Recorded either way. "Not in Open Food Facts" is an answer, and one worth
+  // keeping so the catalogue can stop presenting it as unfinished business.
+  const patch: Partial<Product> = { barcode, offStatus: found ? 'found' : 'missing' }
   if (found) {
     // The lookup wins on naming — it knows the product, where the receipt only
     // knew how to abbreviate it into 22 characters.
@@ -208,6 +213,12 @@ export function sortProducts(list: Product[]): Product[] {
 /** Everything still waiting on its one-time scan, most-bought first. */
 export function unlearned(list: Product[]): Product[] {
   return sortProducts(list.filter((p) => !p.barcode))
+}
+
+/** How Open Food Facts answered, in a word. */
+export function offLabel(product: Product): 'Y' | 'N' | '—' {
+  if (!product.barcode) return '—'
+  return product.offStatus === 'found' ? 'Y' : product.offStatus === 'missing' ? 'N' : '—'
 }
 
 export function searchProducts(list: Product[], query: string): Product[] {

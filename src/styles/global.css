@@ -2023,6 +2023,75 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
   .ktable td { padding: 8px 8px 8px 0; }
 }
 
+/* ---------------------------------------------------------------------------
+   The catalogue table.
+
+   Built for a landscape iPad, which is where several hundred products are
+   actually readable. The identifier columns are monospaced and fixed-width so a
+   run of item numbers lines up digit under digit — the whole point of putting
+   them in a column is comparing down it.
+   --------------------------------------------------------------------------- */
+.cat-table .c-sku,
+.cat-table .c-barcode,
+.cat-table .c-bought {
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+.cat-table .c-sku { width: 1%; }
+.cat-table .c-barcode {
+  width: 1%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: -0.02em;
+}
+.cat-table .c-bought { width: 1%; text-align: right; }
+.cat-table .c-sku small,
+.cat-table .c-bought small {
+  display: block;
+  font-size: 11px;
+  color: var(--text-mute);
+  font-weight: 500;
+}
+/* A placeholder is prose, not data — it must not inherit the barcode column's
+   monospace and negative tracking, which renders "not scanned" with gaps in it. */
+.cat-table .muted {
+  color: var(--text-mute);
+  font-family: inherit;
+  letter-spacing: normal;
+}
+
+/* A one-character answer, so the column can be read straight down. */
+.cat-table .c-off { width: 1%; text-align: center; }
+.off-flag {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1;
+}
+.off-yes { background: color-mix(in srgb, var(--ok, #3a8) 22%, transparent); color: var(--ok, #3a8); }
+.off-no { background: color-mix(in srgb, var(--text-mute) 18%, transparent); color: var(--text-mute); }
+/* Never asked — deliberately the quietest of the three, because it is not a
+   result, it is an absence of one. */
+.off-unknown { background: transparent; color: var(--text-mute); opacity: 0.5; }
+
+/* A product with no barcode is dimmed by .spent, but its name must stay
+   readable — it is the row you are being asked to go and scan. */
+.cat-table .krow.spent { opacity: 0.72; }
+
+@media (max-width: 900px) {
+  .cat-table .c-bought { display: none; }
+}
+@media (max-width: 620px) {
+  /* Down to what a phone can hold: what it is, its code, and whether the
+     database knows it. The catalogue is an iPad screen. */
+  .cat-table .c-sku { display: none; }
+}
+
 /* Kitchen toolbar: search, a filter button that reports its own state, and the
    two view controls — on one line instead of four stacked segmented bars. */
 .ktools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
