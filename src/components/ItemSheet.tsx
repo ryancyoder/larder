@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveQuery } from '../app/live'
 import type { ItemView, StorageLocation } from '../db/schema'
 import { categoryMeta } from '../lib/categories'
 import { placeEmoji, placeLabel } from '../lib/locations'
@@ -41,6 +41,10 @@ export default function ItemSheet({ item, onClose }: { item: ItemView; onClose: 
   const credit = useLiveQuery(
     async () => (item.photoId == null ? undefined : (await database.photos.get(item.photoId))?.attribution),
     [item.photoId],
+  )
+  const trip = useLiveQuery(
+    async () => (item.tripId == null ? undefined : await database.trips.get(item.tripId)),
+    [item.tripId],
   )
 
   async function doUse() {
@@ -208,6 +212,15 @@ export default function ItemSheet({ item, onClose }: { item: ItemView; onClose: 
 
           <dl style={{ margin: 0, fontSize: 12.5, color: 'var(--text-mute)', display: 'grid', gap: 4 }}>
             <div className="row"><dt>Bought</dt><span className="spacer" /><dd style={{ margin: 0, color: 'var(--text-dim)' }}>{relativeDays(item.purchasedAt)}</dd></div>
+            {trip && (
+              <div className="row">
+                <dt>From</dt><span className="spacer" />
+                <dd style={{ margin: 0, color: 'var(--text-dim)' }}>
+                  {trip.store}
+                  {trip.source === 'receipt' ? ' · receipt' : trip.source === 'scan' ? ' · scanned' : ''}
+                </dd>
+              </div>
+            )}
             {item.expiresAt && (
               <div className="row"><dt>Best before</dt><span className="spacer" /><dd style={{ margin: 0, color: 'var(--text-dim)' }}>{item.expiresAt} · {fresh.days}d</dd></div>
             )}

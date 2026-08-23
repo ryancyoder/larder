@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useEvents, useTrips } from '../app/data'
 import {
   categoryTotals, headline, money, monthlySeries, tripStats, wasteLeaders,
@@ -7,10 +7,13 @@ import { categoryMeta } from '../lib/categories'
 import { formatMonth } from '../lib/dates'
 import { GroupedBars, IntervalLine, Meter, RankedBars } from '../components/charts'
 import { Empty, Section, Stat } from '../components/ui'
+import TripSheet from '../components/TripSheet'
+import type { Trip } from '../db/schema'
 
 export default function Insights({ onOpenSettings }: { onOpenSettings: () => void }) {
   const events = useEvents()
   const trips = useTrips()
+  const [openTrip, setOpenTrip] = useState<Trip | null>(null)
 
   const series = useMemo(() => monthlySeries(events ?? [], 6), [events])
   const head = useMemo(() => headline(series), [series])
@@ -91,7 +94,15 @@ export default function Insights({ onOpenSettings }: { onOpenSettings: () => voi
             value={shopping.avgIntervalDays != null ? `${shopping.avgIntervalDays}` : '—'}
             delta={shopping.daysSinceLast != null ? `${shopping.daysSinceLast} since the last one` : undefined}
           />
-          <Stat label="Average basket" value={money(shopping.avgBasket)} delta={`${shopping.count} trips logged`} />
+          <Stat
+            label="Average basket"
+            value={money(shopping.avgBasket)}
+            delta={
+              shopping.pricedCount === shopping.count
+                ? `${shopping.count} trips logged`
+                : `${shopping.pricedCount} of ${shopping.count} trips priced`
+            }
+          />
           <Stat
             label="Eaten, not binned"
             value={head.spendThisMonth > 0 ? `${Math.round((1 - head.wasteRate) * 100)}%` : '—'}
@@ -170,18 +181,27 @@ export default function Insights({ onOpenSettings }: { onOpenSettings: () => voi
         <Section title="Recent trips">
           <div className="stack auto-cols" style={{ gap: 6 }}>
             {shopping.recent.map((t) => (
-              <div className="item" key={t.id} style={{ padding: '9px 12px' }}>
-                <span style={{ fontSize: 17, flex: 'none' }}>🧾</span>
+              <button
+                className="item"
+                key={t.id}
+                onClick={() => setOpenTrip(t)}
+                style={{ padding: '9px 12px', width: '100%', textAlign: 'left', cursor: 'pointer' }}
+              >
+                <span style={{ fontSize: 17, flex: 'none' }}>{t.source === 'scan' ? '⚡' : '🧾'}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="name" style={{ fontSize: 14 }}>{t.store}</div>
                   <div className="meta"><span>{t.date}</span><span>·</span><span>{t.itemCount} items</span></div>
                 </div>
-                <div className="qty">{money(t.total)}</div>
-              </div>
+                {/* An unpriced trip shows nothing rather than $0.00, which would
+                    read as a free shop instead of one that never saw a till. */}
+                <div className="qty">{t.total > 0 ? money(t.total) : '—'}</div>
+              </button>
             ))}
           </div>
         </Section>
       )}
+
+      {openTrip && <TripSheet trip={openTrip} onClose={() => setOpenTrip(null)} />}
     </>
   )
 }

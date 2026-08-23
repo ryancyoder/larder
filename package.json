@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:receipt": "esbuild src/lib/receipt.test.ts --bundle --platform=node --format=esm --outfile=node_modules/.tmp/receipt.test.mjs --log-level=error --define:import.meta.env='{}' && node node_modules/.tmp/receipt.test.mjs"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",

@@ -209,6 +209,9 @@ export async function confirmInbox(
     barcode: row.barcode,
     brand: row.brand,
     nutrition: row.nutrition,
+    // Set when the row came off a scanned shop, so naming it late still files
+    // it under the trip it actually arrived on.
+    tripId: row.tripId,
   })
 
   // Clear the row without deleting the photo — the item owns it now.

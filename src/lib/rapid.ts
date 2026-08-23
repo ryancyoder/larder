@@ -1,5 +1,5 @@
 import { db } from '../db/db'
-import type { Category, Nutrition } from '../db/schema'
+import type { Category, Nutrition, Trip } from '../db/schema'
 import { guessCategory } from './categories'
 import { addItem } from './inventory'
 import { suggestExpiry, suggestPlace } from './locations'
@@ -73,6 +73,8 @@ export interface CommitResult {
   added: number
   /** Unknown barcodes parked in the inbox to be named. */
   parked: number
+  /** The trip everything scanned was filed under. */
+  tripId: number
 }
 
 /**
@@ -83,10 +85,24 @@ export interface CommitResult {
  * the digits kept, because an unnamed item in the kitchen is worse than one
  * sitting in Unpack waiting for a name.
  */
-export async function commitScans(lines: ScanLine[]): Promise<CommitResult> {
+export async function commitScans(lines: ScanLine[], store = ''): Promise<CommitResult> {
   const places = await db.places.toArray()
   let added = 0
   let parked = 0
+
+  // One pile on the counter is one shop, so it gets a trip like any other —
+  // without it, everything scanned would be stock that arrived from nowhere.
+  // No total: a barcode says what a thing is, never what it cost. `total: 0`
+  // means unpriced rather than free, which is why the basket average in
+  // insights.ts counts only trips that have one.
+  const trip: Omit<Trip, 'id'> = {
+    date: todayISO(),
+    store: store.trim() || 'Scanned shop',
+    total: 0,
+    itemCount: lines.reduce((n, l) => n + l.qty, 0),
+    source: 'scan',
+  }
+  const tripId = await db.trips.add(trip)
 
   for (const line of lines) {
     if (line.status === 'found' && line.name) {
@@ -107,6 +123,7 @@ export async function commitScans(lines: ScanLine[]): Promise<CommitResult> {
         barcode: line.barcode,
         brand: line.brand,
         nutrition: line.nutrition,
+        tripId,
       })
       added++
     } else {
@@ -118,6 +135,7 @@ export async function commitScans(lines: ScanLine[]): Promise<CommitResult> {
           qty: 1,
           unit: 'ea',
           scanned: true,
+          tripId,
           guessSource: 'barcode',
           guessNote: 'Scanned, but not in Open Food Facts — give it a name',
           createdAt: new Date().toISOString(),
@@ -127,5 +145,5 @@ export async function commitScans(lines: ScanLine[]): Promise<CommitResult> {
     }
   }
 
-  return { added, parked }
+  return { added, parked, tripId }
 }

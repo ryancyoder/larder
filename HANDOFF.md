@@ -52,13 +52,33 @@ being in `package.json`. It was migrated to Postgres.
 2. **Photos live in Supabase Storage**, not IndexedDB — uploaded as `<household>/<uuid>-full.webp`
    and `-thumb.webp` (see `src/lib/photos.ts`).
 
-### ⚠️ Suspected stale import
+### Shopping trips
 
-`src/components/ItemSheet.tsx` still imports `useLiveQuery` from **`dexie-react-hooks`**,
-while everything else uses the app's own `src/app/live.ts`. Dexie's version depends on
-Dexie's observability, which no longer exists here, so that sheet may not refresh on
-changes. **I noticed this while writing these notes and did not test or fix it** — worth
-verifying before trusting live updates in the item sheet.
+`trips` and `items.trip_id` shipped in `0001_init.sql` but only ever half-worked: the
+shopping-list checkout was the one thing that wrote them and nothing read them back, so
+the live database had **zero trips** against 24 items. Migrations `0003` and `0004`
+finished the model:
+
+- `items.trip_id` has a real foreign key at last (`on delete set null` — losing a receipt
+  must not take the food off the shelf), plus an index for "what did this trip buy?".
+- `trips.source` is `'checkout' | 'receipt' | 'scan'`, because the three routes carry
+  different confidence.
+- `trips.printed_total` sits beside `trips.total`. They disagree when a line was skipped or
+  mis-read, and that gap is the only evidence an import was imperfect — recomputing `total`
+  would erase it.
+- `inbox_items.trip_id` carries the trip through the inbox, so a scan named three days
+  later still lands on the shop it came from.
+
+All three entry routes now record a trip. `TripSheet` (opened from *Recent trips* on
+Insights) is the first screen that ever showed one.
+
+### The stale Dexie import is gone
+
+`src/components/ItemSheet.tsx` was the last file importing `useLiveQuery` from
+`dexie-react-hooks`, which could not observe anything once Dexie stopped being the
+database. It now uses `src/app/live.ts` like everything else. Nothing in `src/` imports
+`dexie` or `dexie-react-hooks` any more, though both are still in `package.json` — safe to
+drop whenever someone wants to touch the lockfile.
 
 ---
 
@@ -102,6 +122,7 @@ Newest first:
 
 | Commit | What |
 |---|---|
+| `Import a receipt…` | Third rapid-entry route, and the trip model finished behind it. See below. |
 | `Kitchen: one toolbar…` | Four stacked filter bars → one row: search, a Filters button reporting its active count, and Group / Sort selects. Filters moved into a sheet. |
 | `Kitchen: drop "Eat me first"…` | Removed the scrolling urgency strip; the item list became a real table. |
 | `Fix the camera going black…` | See §5 — the most instructive bug here. |
@@ -123,6 +144,58 @@ Newest first:
   regression. *Food A–Z* sorts on the matched basic food (`foodMeta(item.foodKey)`), so all
   the onions gather regardless of brand, with ties falling back to item name.
 - Group and sort persist to `localStorage` under `larder-kitchen-view`.
+
+### Receipt import — `src/lib/receipt.ts` + `src/screens/ReceiptImport.tsx`
+
+Unpack → **🧾 Import a receipt**. Paste the text of a receipt, or photograph it.
+
+- **Why it exists:** it is the only entry route that knows what things *cost*. The ledger
+  has had a `value` column since the first release and almost nothing to put in it, so
+  Insights' spend figures were built on the shopping-list checkout alone — which the live
+  database says has never once been used.
+- **Everything above `commitReceipt` is pure.** Text in, lines out, no network and no
+  database. That is the whole debugging story for a parser that has to cope with input
+  nobody controls.
+- **Two stages, deliberately.** Parse, then review, then commit. A parser guessing at
+  somebody's layout will be wrong eventually, and a wrong *price* that lands silently is
+  worse than one you were shown first. Nothing touches the kitchen until the second screen.
+- **Unknown barcodes still go to the kitchen**, named by the receipt's own description —
+  unlike the rapid scanner, which parks them in the inbox. The receipt always supplies a
+  name and a price, so there is nothing left to ask.
+- **Open Food Facts runs in the background** and overrides the name in place when it has a
+  better one. It never overrides price or quantity: only the receipt knows those.
+- **Discounts are kept, not dropped.** A negative line never becomes stock, but leaving it
+  out would make every receipt with a coupon look mis-read.
+- The **printed total is stored beside the computed one**, and the screen reports the gap
+  rather than flagging it. Tax and summary savings lines explain almost all of it.
+
+#### The parser, and its tests
+
+`npm run test:receipt` — 38 assertions over five real chain layouts (Walmart, Kroger,
+Costco, Sam's Club, Target) plus the photo route. **These were kept**, unlike the throwaway
+`rapid.ts` tests. When a receipt reads wrong, paste it in as a new case, watch it fail, fix
+the parser, and check the other five still pass. No test framework: the parser is pure, so
+a file of assertions and an exit code is the whole requirement.
+
+Things that cost a debugging cycle and are now pinned by a test:
+
+- **Order matters.** Strip the price from the end first, then the barcode, then read the
+  description. The other way round lets a price's digits look like a product code.
+- **The `@` clause must be read against the line including its price.** On a bare
+  `3 @ 0.39` the unit price *is* the price at the end, so searching only what survives the
+  strip leaves `3 @` and the quantity vanishes.
+- **A continuation line attaches by source row, not by "the last line we kept".** Without
+  that, an amount line following a dropped row rewrites some earlier item — which is how
+  2.14 lb of bananas became 2.14 gallons of milk.
+- **Tax flags sit on both sides of the price** on Walmart-style layouts, and only the one
+  after the barcode is reachable once the digits are gone.
+- Noise matching allows leading decoration (`**** TOTAL`) but a line still survives as a
+  product when it has a price and a real barcode — `TOTAL CEREAL` is a thing you can buy.
+- Six-digit store codes are **not** barcodes. Sending one to Open Food Facts returns a
+  confident answer about the wrong product, so only 8–14 digit runs are accepted.
+
+The shorthand table (`GV` → Great Value, `SHRD` → Shredded) is deliberately conservative
+and meant to be added to as real receipts turn up words it does not know.
 
 ### Barcode scanning
 
@@ -222,14 +295,23 @@ trigger *and* revisit the join screen.
 
 ## 7. Known gaps and things I couldn't verify
 
-- **`ItemSheet.tsx`'s Dexie import** (§2) — suspected stale, untested.
+- **The receipt parser has only been run against layouts I wrote by hand.** Five chains,
+  no real paper. Expect the first genuine receipt to need a new case in
+  `src/lib/receipt.test.ts`.
+- **The photo route is untested end to end** — it needs an Anthropic API key, and the
+  `settings` table currently has no rows at all, so nobody has ever set one.
+- **`commitReceipt` is not atomic.** It cannot be (§2): the trip is written first, then the
+  items one at a time, so a failure part-way leaves a trip with fewer items than it claims.
+  Written in that order on purpose — items with a short trip read as an incomplete import,
+  where items with no trip read as nothing at all.
 - **Camera behaviour is untested by me.** Continuous scanning, the 1.8s cooldown, the beep,
   and vibration all need a real phone and real packets. On iOS, Safari may require a user
   gesture before audio plays; opening the sheet is a tap, which *should* satisfy it, but if
   the beep is silent the audio unlock needs moving to the button press.
 - **Kitchen header buttons overflow** off the right edge on a narrow phone
   (Unpack / Tiles / Select / Settings). Pre-existing; noticed, not fixed.
-- No test suite. The `rapid.ts` tests were throwaway.
+- No test suite beyond `npm run test:receipt`. The `rapid.ts` tests were throwaway; the
+  receipt ones were not.
 
 ---
 

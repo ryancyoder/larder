@@ -154,6 +154,11 @@ export interface InboxItem {
   /** Why there is no guess — distinct from not having looked yet. */
   guessNote?: string
   scanned: boolean
+  /**
+   * The shop this arrived from, carried through so a row named days later still
+   * lands on the right trip. Absent for a photo imported on its own.
+   */
+  tripId?: number
   createdAt: string
 }
 
@@ -374,13 +379,36 @@ export interface ShopItem {
   itemId?: number
 }
 
+/**
+ * One shop: everything that came home at the same time.
+ *
+ * The link to stock is `Item.tripId`, so a trip can answer "what did this
+ * receipt actually buy?" long after the paper is thrown away — which is the
+ * point of recording it at all.
+ */
 export interface Trip {
   id?: number
   date: string
   store: string
+  /** Sum of what the imported lines cost — the app's own figure. */
   total: number
   itemCount: number
+  /**
+   * How it was recorded. The three routes carry different confidence: a
+   * receipt is what the till charged, a scan is what someone pointed a camera
+   * at, and a checkout is what they meant to buy.
+   */
+  source: TripSource
+  /**
+   * The total printed on the receipt, when one was read. Kept beside `total`
+   * rather than replacing it: the two disagree when a line was skipped or
+   * mis-read, and that gap is the only evidence the import was imperfect.
+   */
+  printedTotal?: number
+  note?: string
 }
+
+export type TripSource = 'checkout' | 'receipt' | 'scan'
 
 /** Append-only ledger. Every insight on the Insights screen is derived from this. */
 export interface LedgerEvent {

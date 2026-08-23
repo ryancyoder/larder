@@ -301,3 +301,121 @@ export async function identifyPhoto(
     return null
   }
 }
+
+
+// ---------------------------------------------------------------------------
+// Reading a receipt
+//
+// The photo counterpart to the text parser in lib/receipt.ts. The model's job
+// here is transcription, not interpretation: it reads the rows off the paper
+// and the parser does the rest, so a photographed receipt and a pasted one meet
+// the same code and behave the same way.
+// ---------------------------------------------------------------------------
+
+const RECEIPT_SCHEMA = {
+  type: 'object',
+  properties: {
+    store: { type: 'string', description: 'Shop name as printed. Empty if not visible.' },
+    date: { type: 'string', description: 'Purchase date as yyyy-mm-dd. Empty if not legible.' },
+    printedTotal: { type: 'number', description: 'The TOTAL line. 0 if not visible.' },
+    lines: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          barcode: { type: 'string', description: 'Product code digits as printed. Empty if the line has none.' },
+          description: { type: 'string', description: 'Item text exactly as printed, abbreviations and all.' },
+          qty: { type: 'number', description: 'Units bought. 1 unless the line says otherwise.' },
+          price: { type: 'number', description: 'What the line cost in total. Negative for a discount.' },
+        },
+        required: ['description', 'qty', 'price'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['store', 'date', 'printedTotal', 'lines'],
+  additionalProperties: false,
+} as const
+
+export interface ReceiptScan {
+  store: string
+  date: string
+  printedTotal: number
+  lines: Array<{ barcode?: string; description: string; qty: number; price: number }>
+}
+
+/**
+ * A photographed receipt, transcribed.
+ *
+ * Deliberately asks for the description *unexpanded*. The model would happily
+ * turn "GV SHRD MOZZ 8Z" into "Great Value Shredded Mozzarella 8 oz", but then
+ * the two import routes would disagree about the same shop, and a mistake in
+ * the expansion would be invisible — there would be nothing left to compare it
+ * against. Keeping the till text means `expandDescription` stays the single
+ * place that guesses, and the raw text is still on screen to check it.
+ */
+export async function readReceiptPhoto(apiKey: string, image: Blob): Promise<ReceiptScan | null> {
+  if (!apiKey) throw new AIError('No API key set. Add one in Settings.')
+
+  const media = image.type && image.type.startsWith('image/') ? image.type : 'image/webp'
+
+  let res: Response
+  try {
+    res = await fetch(ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 8000,
+        output_config: { format: { type: 'json_schema', schema: RECEIPT_SCHEMA } },
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: media, data: await toBase64(image) } },
+            {
+              type: 'text',
+              text: [
+                'This is a photograph of a grocery till receipt.',
+                'Transcribe every purchased line: the product code if one is printed, the',
+                'description exactly as printed, the quantity, and what the line cost in total.',
+                'Keep the shop\'s abbreviations verbatim — do not expand "GV SHRD MOZZ" into',
+                'real words, and do not tidy the spelling. Something else does that, and it',
+                'needs the original to check itself against.',
+                'Skip subtotals, tax, tender, change, card details and store furniture.',
+                'Include discounts and coupons as lines with a negative price.',
+                'If a line\'s price is illegible, leave it out rather than guessing — a wrong',
+                'price is worse than a missing one, because nobody re-checks a number that',
+                'looks plausible.',
+              ].join(' '),
+            },
+          ],
+        }],
+      }),
+    })
+  } catch {
+    throw new AIError('Could not reach the API. Check your connection.')
+  }
+
+  if (!res.ok) {
+    if (res.status === 401) throw new AIError('That API key was rejected.')
+    if (res.status === 429) throw new AIError('Rate limited — try again in a moment.')
+    throw new AIError(`API error ${res.status}.`)
+  }
+
+  const data = await res.json()
+  if (data.stop_reason === 'refusal') throw new AIError('The model declined to read that image.')
+
+  const block = data?.content?.find((c: { type: string }) => c.type === 'text')
+  if (!block?.text) return null
+  try {
+    const scan = JSON.parse(block.text) as ReceiptScan
+    return scan.lines?.length ? scan : null
+  } catch {
+    return null
+  }
+}

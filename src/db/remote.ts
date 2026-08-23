@@ -129,7 +129,7 @@ const MAPS: Record<string, FieldMap> = {
   plan_entries: { recipeId: 'recipe_id' },
   meal_days: { itemId: 'item_id', createdAt: 'created_at' },
   shop_items: { estPrice: 'est_price', itemId: 'item_id' },
-  trips: { itemCount: 'item_count' },
+  trips: { itemCount: 'item_count', printedTotal: 'printed_total' },
   ledger_events: { itemId: 'item_id' },
   photos: {
     fullPath: 'full_path', thumbPath: 'thumb_path', remoteUrl: 'remote_url',
@@ -144,7 +144,7 @@ const MAPS: Record<string, FieldMap> = {
   people: {},
   inbox_items: {
     photoId: 'photo_id', guessSource: 'guess_source', guessNote: 'guess_note',
-    createdAt: 'created_at',
+    createdAt: 'created_at', tripId: 'trip_id',
   },
   settings: {},
 }

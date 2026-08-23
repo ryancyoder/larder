@@ -67,6 +67,25 @@ export function useTrips(): Trip[] | undefined {
   return useLiveQuery(() => db.trips.toArray(), [])
 }
 
+/**
+ * What one shop brought home, holds resolved.
+ *
+ * Reads items rather than a stored line list on purpose: a trip is a claim
+ * about where stock came from, so the answer has to come from the stock. An
+ * item eaten or thrown out since simply stops appearing, which is honest —
+ * the trip records what was bought, the kitchen records what is left.
+ */
+export function useTripItems(tripId: number | undefined): ItemView[] | undefined {
+  return useLiveQuery(async () => {
+    if (tripId == null) return []
+    const [items, reservations] = await Promise.all([
+      db.items.where('tripId').equals(tripId).toArray(),
+      db.reservations.toArray(),
+    ])
+    return buildViews(items, reservations)
+  }, [tripId])
+}
+
 export function useEvents(): LedgerEvent[] | undefined {
   return useLiveQuery(() => db.events.toArray(), [])
 }
