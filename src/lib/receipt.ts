@@ -3,7 +3,10 @@ import type { Category, InboxItem, Nutrition, Trip, Unit } from '../db/schema'
 import { addItem } from './inventory'
 import { suggestExpiry, suggestPlace } from './locations'
 import { todayISO } from './dates'
-import { upsertProduct } from './products'
+import {
+  comparePrice, lastPaidByProduct, productByCode,
+  upsertProduct, type PriceChange,
+} from './products'
 
 /**
  * Reading a till receipt.
@@ -810,6 +813,91 @@ export function setLineField(
   patch: Partial<ReceiptLine>,
 ): ReceiptLine[] {
   return lines.map((l) => (l.key === key ? { ...l, ...patch } : l))
+}
+
+// ---------------------------------------------------------------------------
+// Recognising a line before it is committed
+// ---------------------------------------------------------------------------
+
+/** What the catalogue already knows about a line on this receipt. */
+export interface LineRecognition {
+  /** Seen before, by till code. */
+  known: boolean
+  /** The catalogue's name, which is usually better than the till's. */
+  name?: string
+  /** Whether it still needs its one-time barcode scan. */
+  needsScan: boolean
+  /** Absent when this is the first time, or when the last purchase had no price. */
+  price?: PriceChange
+}
+
+/**
+ * Matches every line against the catalogue and against what was paid last time.
+ *
+ * The second receipt from a shop is a different thing from the first: most of
+ * it has been seen before, and the interesting part is what changed. Without
+ * this the review screen shows a second ALDI shop exactly like the first — a
+ * wall of lines with no indication which are new, which are known, and which
+ * quietly went up tenpence.
+ *
+ * Read-only. Nothing here writes, so a review can be abandoned freely.
+ */
+export async function recogniseLines(
+  lines: ReceiptLine[],
+  store: string,
+): Promise<Record<string, LineRecognition>> {
+  const items = await db.items.toArray()
+  const lastPaid = lastPaidByProduct(items)
+  const out: Record<string, LineRecognition> = {}
+
+  for (const line of lines) {
+    if (line.kind !== 'item') continue
+
+    const product = line.sku
+      ? await productByCode({ store, sku: line.sku })
+      : line.barcode
+        ? (await db.products.where('barcode').equals(line.barcode).first())
+        : undefined
+
+    if (!product?.id) {
+      out[line.key] = { known: false, needsScan: true }
+      continue
+    }
+
+    const previous = lastPaid.get(product.id)
+    // Per unit, so buying two of something is not mistaken for it doubling.
+    const current = line.price != null && line.qty > 0 ? line.price / line.qty : undefined
+
+    out[line.key] = {
+      known: true,
+      name: product.name,
+      needsScan: !product.barcode,
+      price: previous && current != null ? comparePrice(previous.unitPrice, current) : undefined,
+    }
+  }
+
+  return out
+}
+
+/** Headline counts for the review screen. */
+export function recognitionSummary(
+  lines: ReceiptLine[],
+  found: Record<string, LineRecognition>,
+): { known: number; fresh: number; rises: number; risePounds: number } {
+  let known = 0, fresh = 0, rises = 0, risePounds = 0
+  for (const line of lines) {
+    if (line.kind !== 'item' || !line.include) continue
+    const hit = found[line.key]
+    if (!hit) continue
+    if (hit.known) known++
+    else fresh++
+    if (hit.price?.direction === 'up') {
+      rises++
+      // The rise as actually paid: per unit, times how many were bought.
+      risePounds += hit.price.delta * line.qty
+    }
+  }
+  return { known, fresh, rises, risePounds: Math.round(risePounds * 100) / 100 }
 }
 
 // ---------------------------------------------------------------------------

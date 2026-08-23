@@ -269,6 +269,27 @@ Repeat lines fold: a till prints one line per scan, so two identical salamis are
 two rather than two rows on the shelf. Matched on the till's own text and the unit price,
 never the expanded name.
 
+#### The second receipt from a shop
+
+A first import is a wall of unknown lines. A second is mostly things already in the
+catalogue, and the interesting part is what changed — so `recogniseLines()` matches every
+line by till code before anything is committed and the review screen says, per line,
+whether it has been seen before and whether it costs more than last time.
+
+- **Prices are compared per unit, never per line.** Two jars at $5.18 and one at $2.59 are
+  the same price; comparing line totals would cry inflation every time somebody bought a
+  spare.
+- **The previous price is derived from `items`, not stored on the product** — the catalogue
+  holds no prices (see the identity rule above). `lastPaidByProduct()` does one pass over
+  stock rather than a query per line, because a 73-line receipt would otherwise be 73 round
+  trips.
+- Both figures are rounded to the cent before comparing, so a stored 1.6966666 does not
+  report itself as a rise over 1.70.
+- Recognition re-runs when the **shop name** changes, because a till code only identifies a
+  product alongside the shop that issued it — typing "ALDI" over a blank store field is what
+  makes the whole receipt resolve.
+- It is read-only, so a review can be abandoned freely.
+
 #### Scanning a shop against its receipt — `src/lib/tripScan.ts` + `src/screens/TripScan.tsx`
 
 Unpack shows a banner per shop still waiting on barcodes: **"72 from ALDI need a barcode ·
