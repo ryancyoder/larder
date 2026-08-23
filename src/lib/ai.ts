@@ -7,8 +7,17 @@ import { todayISO } from './dates'
  * Optional Claude-powered recipe generation.
  *
  * The whole app works without this — the ranking engine in suggest.ts is the
- * default. Drop an API key into Settings and this turns on. The key is stored
- * in this browser's IndexedDB and is sent only to api.anthropic.com.
+ * default. Drop an API key into Settings and this turns on.
+ *
+ * The key lives in the `settings` table, which means it is **household-wide and
+ * server-side**, not per-device. That was true the moment storage moved to
+ * Postgres, and the screen claiming otherwise went uncorrected for a while: it
+ * still said "stored in this browser" long after `setSetting` began upserting
+ * to Supabase. Anyone in the household can read it, so it wants a spend limit
+ * on it and to be a key issued for this app alone.
+ *
+ * Requests still go straight from the browser to api.anthropic.com — there is
+ * no proxy, and no server of ours sees the traffic. Only the key is stored.
  */
 
 const MODEL = 'claude-opus-5'
@@ -258,8 +267,14 @@ export async function identifyPhoto(
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 1000,
-        output_config: { format: { type: 'json_schema', schema: PHOTO_SCHEMA } },
+        // Was 1000. The answer is a dozen words, but adaptive thinking is on by
+        // default on this model and spends the same budget, so a ceiling sized
+        // for the output alone can be exhausted before any of it is written.
+        max_tokens: 8000,
+        output_config: {
+          format: { type: 'json_schema', schema: PHOTO_SCHEMA },
+          effort: 'low',
+        },
         messages: [{
           role: 'user',
           content: [
@@ -371,8 +386,19 @@ export async function readReceiptPhoto(apiKey: string, image: Blob): Promise<Rec
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 8000,
-        output_config: { format: { type: 'json_schema', schema: RECEIPT_SCHEMA } },
+        // A long till roll is 40+ lines of JSON, and on this model thinking is
+        // on by default and bills against the same ceiling. Truncation here is
+        // not a short answer — it is a half-written object that fails to parse,
+        // so the whole receipt comes back as "could not read that photo".
+        max_tokens: 16000,
+        output_config: {
+          format: { type: 'json_schema', schema: RECEIPT_SCHEMA },
+          // Transcription, not reasoning. Lower effort is cheaper and quicker;
+          // raise it if receipts start coming back with misread digits, which
+          // is the failure that matters — a wrong price looks plausible and
+          // nobody re-checks it.
+          effort: 'medium',
+        },
         messages: [{
           role: 'user',
           content: [

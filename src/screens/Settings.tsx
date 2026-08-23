@@ -55,7 +55,7 @@ export default function Settings({ onClose }: { onClose: () => void }) {
     await setSetting('anthropicKey', key.trim())
     setHasKey(Boolean(key.trim()))
     setKey('')
-    toast(key.trim() ? 'API key saved on this device' : 'API key cleared')
+    toast(key.trim() ? 'API key saved for the household' : 'API key cleared')
   }
 
   async function exportData() {
@@ -297,8 +297,12 @@ export default function Settings({ onClose }: { onClose: () => void }) {
         </div>
 
         <p style={{ fontSize: 11.5, color: 'var(--text-mute)' }}>
-          The key is stored in this browser's local database and sent only to api.anthropic.com.
-          It never touches a server of ours — there isn't one.
+          <strong>The key is saved for the whole household, not just this device.</strong> It goes
+          into the shared database in plain text, syncs to every signed-in phone, and anyone in
+          the household can read it back. Requests go straight from the browser to
+          api.anthropic.com — nothing proxies them — but the key itself is stored server-side.
+          Set a spend limit on it in the Anthropic console, and use a key created for this app
+          alone so it can be revoked without affecting anything else.
         </p>
       </div>
 
