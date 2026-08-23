@@ -138,7 +138,7 @@ export default function Calendar() {
 }
 
 function DayCell({ day, today, onOpen }: { day: CoverageDay; today: string; onOpen: () => void }) {
-  const { url, cutout } = usePhoto(day.item?.photoId)
+  const { url, cutout } = usePhoto(day.item?.displayPhotoId)
   const meta = day.item ? categoryMeta(day.item.category) : null
   const isToday = day.date === today
   const past = day.date < today

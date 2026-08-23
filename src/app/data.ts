@@ -10,21 +10,32 @@ import type {
 
 /** Live views over IndexedDB. Every screen reads through these, never the tables directly. */
 
+/** Master reference photos, keyed by product. See `ItemView.displayPhotoId`. */
+async function productPhotos(): Promise<Map<number, number>> {
+  const rows = await db.products.toArray()
+  const out = new Map<number, number>()
+  for (const p of rows) if (p.id != null && p.photoId != null) out.set(p.id, p.photoId)
+  return out
+}
+
 export function useKitchen(): ItemView[] | undefined {
   return useLiveQuery(async () => {
-    const [items, reservations] = await Promise.all([
+    const [items, reservations, photos] = await Promise.all([
       db.items.toArray(),
       db.reservations.toArray(),
+      productPhotos(),
     ])
-    return buildViews(items.filter((i) => !i.archived), reservations)
+    return buildViews(items.filter((i) => !i.archived), reservations, photos)
   }, [])
 }
 
 /** Includes used-up staples (qty 0) so the shopping list can rebuy them. */
 export function useAllStock(): ItemView[] | undefined {
   return useLiveQuery(async () => {
-    const [items, reservations] = await Promise.all([db.items.toArray(), db.reservations.toArray()])
-    return buildViews(items, reservations)
+    const [items, reservations, photos] = await Promise.all([
+      db.items.toArray(), db.reservations.toArray(), productPhotos(),
+    ])
+    return buildViews(items, reservations, photos)
   }, [])
 }
 
@@ -86,11 +97,12 @@ export function useTrips(): Trip[] | undefined {
 export function useTripItems(tripId: number | undefined): ItemView[] | undefined {
   return useLiveQuery(async () => {
     if (tripId == null) return []
-    const [items, reservations] = await Promise.all([
+    const [items, reservations, photos] = await Promise.all([
       db.items.where('tripId').equals(tripId).toArray(),
       db.reservations.toArray(),
+      productPhotos(),
     ])
-    return buildViews(items, reservations)
+    return buildViews(items, reservations, photos)
   }, [tripId])
 }
 

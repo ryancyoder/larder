@@ -36,7 +36,7 @@ export default function ItemSheet({ item, onClose }: { item: ItemView; onClose: 
   const perUnit = unitPrice(item)
   const places = usePlaces() ?? []
   const people = usePeople() ?? []
-  const { url: hero, cutout: heroCutout } = usePhoto(item.photoId, 'full')
+  const { url: hero, cutout: heroCutout } = usePhoto(item.displayPhotoId, 'full')
   const total = packTotal(item.qty, item)
   const credit = useLiveQuery(
     async () => (item.photoId == null ? undefined : (await database.photos.get(item.photoId))?.attribution),

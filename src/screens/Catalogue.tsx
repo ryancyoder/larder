@@ -7,7 +7,9 @@ import {
   lastPaidByProduct, offLabel, searchProducts, sweepOpenFoodFacts,
   type LastPaid, type SweepProgress,
 } from '../lib/products'
-import { CatDot, Empty, Glyph, Seg } from '../components/ui'
+import { CatDot, Empty, Glyph, Seg, Sheet } from '../components/ui'
+import PhotoCapture from '../components/PhotoCapture'
+import { db } from '../db/db'
 import { useToast } from '../app/toast'
 
 /**
@@ -88,7 +90,7 @@ function compare(a: Product, b: Product, sort: SortState, paid: Map<number, Last
   return n || a.name.localeCompare(b.name)
 }
 
-export default function Catalogue() {
+export default function Catalogue({ onBack }: { onBack?: () => void }) {
   const products = useProducts()
   const stock = useAllStock()
   const toast = useToast()
@@ -102,6 +104,7 @@ export default function Catalogue() {
       : { key, dir: OPENS_DESC.includes(key) ? 'desc' : 'asc' })
   }
   const [query, setQuery] = useState('')
+  const [editing, setEditing] = useState<Product | null>(null)
   const [sweep, setSweep] = useState<SweepProgress | null>(null)
   const cancelRef = useRef({ cancelled: false })
 
@@ -166,6 +169,11 @@ export default function Catalogue() {
   return (
     <>
       <div className="topbar">
+        {/* This view hides the sidebar to give the table its width back, so it
+            has to carry its own way out. */}
+        {onBack && (
+          <button className="btn ghost sm" onClick={onBack} style={{ flex: 'none' }}>‹ Back</button>
+        )}
         <div>
           <h1>Catalog</h1>
           <div className="sub">
@@ -300,6 +308,7 @@ export default function Catalogue() {
                       key={product.id}
                       product={product}
                       paid={product.id != null ? paid.get(product.id) : undefined}
+                      onPhoto={() => setEditing(product)}
                     />
                   ))}
                 </tbody>
@@ -314,11 +323,48 @@ export default function Catalogue() {
           </section>
         </>
       )}
+
+      {editing && <PhotoSheet product={editing} onClose={() => setEditing(null)} />}
     </>
   )
 }
 
 const money = (n: number) => `$${n.toFixed(2)}`
+
+/**
+ * Setting the master picture for a product.
+ *
+ * Whatever is chosen here becomes the picture *everywhere* — the kitchen, the
+ * tiles, the calendar — because every item resolves through its product. That
+ * is the point: one good photograph of the packet beats a different blurry one
+ * per carton.
+ *
+ * A replaced photo is left in storage rather than deleted. Items keep their own
+ * `photoId` as a fallback and may still point at it, and an orphaned blob is a
+ * far cheaper mistake than a picture that vanishes somewhere else in the app.
+ */
+function PhotoSheet({ product, onClose }: { product: Product; onClose: () => void }) {
+  const toast = useToast()
+
+  async function set(photoId: number | undefined) {
+    if (product.id == null) return
+    await db.products.update(product.id, { photoId })
+    toast(photoId == null ? 'Picture removed' : `Picture set for ${product.name}`)
+  }
+
+  return (
+    <Sheet title={product.name} onClose={onClose}>
+      <p style={{ fontSize: 12.5, color: 'var(--text-mute)', margin: 0 }}>
+        The catalogue's reference picture. Every one of these you own shows this photo — in
+        the kitchen, the tiles and the calendar — so it is worth taking once, well.
+        {product.offStatus === 'found' && product.photoId != null
+          ? " The one there now came from Open Food Facts; yours replaces it."
+          : ''}
+      </p>
+      <PhotoCapture photoId={product.photoId} onChange={set} label="Reference picture" />
+    </Sheet>
+  )
+}
 
 /**
  * A column heading that sorts.
@@ -355,7 +401,9 @@ function SortTh({
   )
 }
 
-function Row({ product, paid }: { product: Product; paid?: LastPaid }) {
+function Row({
+  product, paid, onPhoto,
+}: { product: Product; paid?: LastPaid; onPhoto: () => void }) {
   const meta = categoryMeta(product.category)
   const food = foodMeta(product.foodKey)
   const off = offLabel(product)
@@ -363,7 +411,14 @@ function Row({ product, paid }: { product: Product; paid?: LastPaid }) {
   return (
     <tr className={`krow${product.barcode ? '' : ' spent'}`}>
       <td className="c-pic">
-        <Glyph emoji={meta.emoji} photoId={product.photoId} size={30} rounded />
+        <button
+          className="pic-swap"
+          onClick={onPhoto}
+          title={product.photoId != null ? 'Replace this picture' : 'Add a picture'}
+          aria-label={`${product.photoId != null ? 'Replace' : 'Add'} the picture for ${product.name}`}
+        >
+          <Glyph emoji={meta.emoji} photoId={product.photoId} size={30} rounded />
+        </button>
       </td>
 
       <td className="k-name">

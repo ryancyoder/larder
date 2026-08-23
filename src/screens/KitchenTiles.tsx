@@ -92,7 +92,7 @@ const MEAL_MARKS: Array<{ key: MealSlot; letter: string; label: string }> = [
 
 function KitchenTile({ item, showMeals, onOpen, onHold }: { item: ItemView; showMeals: boolean; onOpen: () => void; onHold: () => void }) {
   const toast = useToast()
-  const { url: photo, cutout } = usePhoto(item.photoId, 'thumb')
+  const { url: photo, cutout } = usePhoto(item.displayPhotoId, 'thumb')
   const meta = categoryMeta(item.category)
   const fresh = freshnessOf(item)
   const low = isLow(item)

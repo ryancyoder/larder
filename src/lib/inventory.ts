@@ -32,8 +32,18 @@ export function unitPrice(item: Item): number {
   return item.price / item.qtyInitial
 }
 
-/** Joins holds onto items so every screen can reason about `available` directly. */
-export function buildViews(items: Item[], reservations: Reservation[]): ItemView[] {
+/**
+ * Joins holds onto items so every screen can reason about `available` directly.
+ *
+ * @param productPhotos Master reference photo per product. Resolved here, once,
+ *   rather than in each tile: a per-component lookup would mean one live
+ *   subscription per row, all re-running on any write.
+ */
+export function buildViews(
+  items: Item[],
+  reservations: Reservation[],
+  productPhotos?: Map<number, number>,
+): ItemView[] {
   const byItem = new Map<number, Reservation[]>()
   for (const r of reservations) {
     const list = byItem.get(r.itemId)
@@ -43,7 +53,16 @@ export function buildViews(items: Item[], reservations: Reservation[]): ItemView
   return items.map((item) => {
     const holds = item.id ? byItem.get(item.id) ?? [] : []
     const reserved = holds.reduce((sum, h) => sum + h.qty, 0)
-    return { ...item, holds, reserved, available: Math.max(0, item.qty - reserved) }
+    // The catalogue's picture wins. It is the one somebody chose for the
+    // product, where the item's own is whatever was photographed that day.
+    const master = item.productId != null ? productPhotos?.get(item.productId) : undefined
+    return {
+      ...item,
+      holds,
+      reserved,
+      available: Math.max(0, item.qty - reserved),
+      displayPhotoId: master ?? item.photoId,
+    }
   })
 }
 

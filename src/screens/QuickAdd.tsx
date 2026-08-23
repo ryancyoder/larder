@@ -44,7 +44,7 @@ export default function QuickAdd({ onClose }: { onClose: () => void }) {
 }
 
 function ShopTile({ item, qty, list }: { item: ItemView; qty: number; list: Parameters<typeof shopQtyFor>[0] }) {
-  const { url: photo, cutout } = usePhoto(item.photoId, 'thumb')
+  const { url: photo, cutout } = usePhoto(item.displayPhotoId, 'thumb')
   const meta = categoryMeta(item.category)
   const fresh = freshnessOf(item)
   const low = isLow(item)

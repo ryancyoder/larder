@@ -82,6 +82,12 @@ function Gate() {
 
 function Shell() {
   const [tab, setTab] = useState<Tab>(readTab)
+  /**
+   * Where "back" goes from a full-width view. The Catalog hides the nav to give
+   * its table the sidebar's 216px, so it needs somewhere to return to — and
+   * "wherever you were" beats always dumping you in the Kitchen.
+   */
+  const [cameFrom, setCameFrom] = useState<Tab>('kitchen')
   const [ready, setReady] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
 
@@ -102,7 +108,14 @@ function Shell() {
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
 
+  /** Views that hide the nav to reclaim its width, and so need a way back. */
+  const FULL_WIDTH: Tab[] = ['catalogue']
+  const focused = FULL_WIDTH.includes(tab)
+
   const go = (next: Tab) => {
+    // Remember what a full-width view was entered from, so Back returns there
+    // rather than always dumping you in the Kitchen.
+    if (FULL_WIDTH.includes(next) && !FULL_WIDTH.includes(tab)) setCameFrom(tab)
     setTab(next)
     window.location.hash = next
     window.scrollTo({ top: 0 })
@@ -116,8 +129,9 @@ function Shell() {
   return (
     <LayoutProvider>
     <ToastProvider>
-      <div className="app">
-        <nav className="nav" aria-label="Sections">
+      <div className={`app${focused ? ' focused' : ''}`}>
+        {/* Hidden in a full-width view; that screen carries its own Back. */}
+        <nav className="nav" aria-label="Sections" hidden={focused}>
           <div className="brand"><span>🥬</span> Larder</div>
           {TABS.map((t) => (
             <div className="slot" key={t.key}>
@@ -145,7 +159,7 @@ function Shell() {
             <>
               {tab === 'kitchen' && <Kitchen onOpenSettings={() => setSettingsOpen(true)} />}
               {tab === 'foods' && <Foods />}
-              {tab === 'catalogue' && <Catalogue />}
+              {tab === 'catalogue' && <Catalogue onBack={() => go(cameFrom)} />}
               {tab === 'plan' && <Planning />}
               {tab === 'recipes' && <Recipes onOpenSettings={() => setSettingsOpen(true)} />}
               {tab === 'shop' && <Shop />}
