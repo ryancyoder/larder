@@ -2085,6 +2085,41 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
 }
 /* A placeholder is prose, not data — it must not inherit the barcode column's
    monospace and negative tracking, which renders "not scanned" with gaps in it. */
+/* A heading that sorts. The button fills the cell so the whole heading is the
+   target, and inherits the th's type so nothing looks like a form control. */
+.ktable thead th .th-sort {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  text-align: inherit;
+  cursor: pointer;
+  padding: 0;
+  background: none;
+  border: 0;
+}
+.ktable thead th.k-qty .th-sort,
+.ktable thead th.c-size .th-sort,
+.ktable thead th.c-off .th-sort { justify-content: flex-end; }
+.ktable thead th.c-off .th-sort { justify-content: center; }
+.ktable thead th .th-sort:hover { color: var(--text-dim); }
+.ktable thead th.sorted { color: var(--text-dim); }
+.th-arrow { font-size: 8.5px; line-height: 1; }
+
+/* The product shot. A fixed square so a column of them lines up, and the
+   category emoji stands in until a picture is fetched. */
+.cat-table .c-pic { width: 1%; padding-right: 8px; }
+.cat-table .c-food {
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  width: 1%;
+}
+
 .cat-table .muted {
   color: var(--text-mute);
   font-family: inherit;
@@ -2139,12 +2174,24 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
    readable — it is the row you are being asked to go and scan. */
 .cat-table .krow.spent { opacity: 0.72; }
 
-@media (max-width: 900px) {
+/* Nine columns is a lot, and the width that matters is `.main`'s, not the
+   viewport's — in the wide layout a 216px rail comes off the front, so a 1180px
+   iPad gives the table 964px and a 1000px window gives it 784px. The
+   breakpoints are set from measuring that, not from guessing at device sizes.
+   Columns go in order of how much each earns its width. */
+@media (max-width: 1150px) {
   .cat-table .c-size { display: none; }
 }
+@media (max-width: 1080px) {
+  .cat-table .c-food { display: none; }
+}
+@media (max-width: 940px) {
+  /* Food already says what it is; the category is the coarser of the two. */
+  .cat-table .k-cat { display: none; }
+}
 @media (max-width: 620px) {
-  /* Down to what a phone can hold: what it is, its code, and whether the
-     database knows it. The catalogue is an iPad screen. */
+  /* Down to what a phone can hold: the picture, what it is, its code, whether
+     the database knows it, and what it cost. The catalogue is an iPad screen. */
   .cat-table .c-sku { display: none; }
 }
 

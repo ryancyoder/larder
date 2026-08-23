@@ -7,7 +7,7 @@ import {
   lastPaidByProduct, offLabel, searchProducts, sweepOpenFoodFacts,
   type LastPaid, type SweepProgress,
 } from '../lib/products'
-import { CatDot, Empty, Seg } from '../components/ui'
+import { CatDot, Empty, Glyph, Seg } from '../components/ui'
 import { useToast } from '../app/toast'
 
 /**
@@ -36,22 +36,55 @@ type View = 'all' | 'unscanned' | 'scanned'
  * on purpose. Those are facts about purchases, and Trips and Insights answer
  * them from the record that owns them.
  */
-type SortKey = 'name' | 'sku' | 'category' | 'price'
+/**
+ * Every column sorts, and clicking the one already sorted reverses it.
+ *
+ * Each key carries the direction it should open in, because "sensible first" is
+ * not one answer for every column: names read A–Z, prices read dearest first.
+ */
+type SortKey = 'photo' | 'name' | 'food' | 'category' | 'sku' | 'barcode' | 'off' | 'size' | 'price'
+type Dir = 'asc' | 'desc'
 
-function compare(
-  a: Product, b: Product, key: SortKey, paid: Map<number, LastPaid>,
-): number {
+const OPENS_DESC: SortKey[] = ['price', 'size', 'photo']
+
+interface SortState { key: SortKey; dir: Dir }
+
+/** Sorts last whatever the direction, so blanks never crowd the top. */
+const LAST = '\uffff'
+
+/**
+ * Answered, then unanswered, then unasked — the order that puts what still
+ * needs doing at one end rather than scattering it.
+ */
+function offRank(p: Product): number {
+  if (!p.barcode) return 3
+  return p.offStatus === 'found' ? 0 : p.offStatus === 'missing' ? 1 : 2
+}
+
+function value(p: Product, key: SortKey, paid: Map<number, LastPaid>): string | number {
   switch (key) {
-    case 'sku': return (a.sku ?? '\uffff').localeCompare(b.sku ?? '\uffff') || a.name.localeCompare(b.name)
-    case 'category': return a.category.localeCompare(b.category) || a.name.localeCompare(b.name)
-    case 'price': {
-      // Dearest first, and anything never bought sorts last rather than as free.
-      const pa = a.id != null ? paid.get(a.id)?.unitPrice : undefined
-      const pb = b.id != null ? paid.get(b.id)?.unitPrice : undefined
-      return (pb ?? -1) - (pa ?? -1) || a.name.localeCompare(b.name)
-    }
-    default: return a.name.localeCompare(b.name)
+    case 'photo': return p.photoId != null ? 1 : 0
+    case 'food': return foodMeta(p.foodKey)?.name.toLowerCase() ?? LAST
+    case 'category': return p.category
+    case 'sku': return p.sku ?? LAST
+    case 'barcode': return p.barcode ?? LAST
+    case 'off': return offRank(p)
+    case 'size': return p.size ?? -1
+    case 'price': return (p.id != null ? paid.get(p.id)?.unitPrice : undefined) ?? -1
+    default: return p.name.toLowerCase()
   }
+}
+
+function compare(a: Product, b: Product, sort: SortState, paid: Map<number, LastPaid>): number {
+  const va = value(a, sort.key, paid)
+  const vb = value(b, sort.key, paid)
+  let n = typeof va === 'number' && typeof vb === 'number'
+    ? va - vb
+    : String(va).localeCompare(String(vb))
+  if (sort.dir === 'desc') n = -n
+  // Name breaks every tie, so the order is stable and reads alphabetically
+  // within a group.
+  return n || a.name.localeCompare(b.name)
 }
 
 export default function Catalogue() {
@@ -59,7 +92,14 @@ export default function Catalogue() {
   const stock = useAllStock()
   const toast = useToast()
   const [view, setView] = useState<View>('all')
-  const [sort, setSort] = useState<SortKey>('name')
+  const [sort, setSort] = useState<SortState>({ key: 'name', dir: 'asc' })
+
+  /** The same column reverses; a new one opens whichever way reads best. */
+  function toggle(key: SortKey) {
+    setSort((prev) => prev.key === key
+      ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
+      : { key, dir: OPENS_DESC.includes(key) ? 'desc' : 'asc' })
+  }
   const [query, setQuery] = useState('')
   const [sweep, setSweep] = useState<SweepProgress | null>(null)
   const cancelRef = useRef({ cancelled: false })
@@ -178,15 +218,6 @@ export default function Catalogue() {
                 </button>
               ) : null}
 
-              <label className="field" style={{ flex: 'none', minWidth: 130 }}>
-                <span>Sort</span>
-                <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
-                  <option value="name">Name A–Z</option>
-                  <option value="sku">Item number</option>
-                  <option value="category">Category</option>
-                  <option value="price">Price each</option>
-                </select>
-              </label>
             </div>
 
             {/* A legend, not a tooltip: the table is read on a touch screen where
@@ -233,23 +264,32 @@ export default function Catalogue() {
               <table className="ktable cat-table">
                 <thead>
                   <tr>
-                    <th className="k-name">Product</th>
-                    <th className="k-cat">Category</th>
-                    <th className="c-sku">SKU</th>
-                    <th className="c-barcode">Barcode</th>
+                    <SortTh sort={sort} onSort={toggle} col="photo" className="c-pic" label="" title="Picture" />
+                    <SortTh sort={sort} onSort={toggle} col="name" className="k-name" label="Product" />
+                    {/* The basic food, not the product: fresh, canned and frozen
+                        beets are three products and one food. See lib/foods.ts. */}
+                    <SortTh sort={sort} onSort={toggle} col="food" className="c-food" label="Food" />
+                    <SortTh sort={sort} onSort={toggle} col="category" className="k-cat" label="Category" />
+                    <SortTh sort={sort} onSort={toggle} col="sku" className="c-sku" label="SKU" />
+                    <SortTh sort={sort} onSort={toggle} col="barcode" className="c-barcode" label="Barcode" />
                     {/* Written out wherever there is room. "OFF" saves space and
                         costs comprehension — it reads as off/on, which is the
                         first thing anyone asked about this table. */}
-                    <th className="c-off" title="Is this product listed in Open Food Facts?">
-                      <span className="c-off-full">Open Food Facts</span>
-                      <span className="c-off-abbr">OFF</span>
-                    </th>
+                    <SortTh
+                      sort={sort}
+                      onSort={toggle}
+                      col="off"
+                      className="c-off"
+                      label="Open Food Facts"
+                      short="OFF"
+                      title="Is this product listed in Open Food Facts?"
+                    />
                     {/* Pack size, not stock: what one of them contains. How many
                         you have is the Kitchen's question, not this table's. */}
-                    <th className="c-size">Size</th>
+                    <SortTh sort={sort} onSort={toggle} col="size" className="c-size" label="Size" />
                     {/* What one costs, not what a line came to. A line total is a
                         quantity in disguise and compares against nothing. */}
-                    <th className="k-qty">Price each</th>
+                    <SortTh sort={sort} onSort={toggle} col="price" className="k-qty" label="Price each" />
                   </tr>
                 </thead>
                 <tbody>
@@ -278,6 +318,41 @@ export default function Catalogue() {
 
 const money = (n: number) => `$${n.toFixed(2)}`
 
+/**
+ * A column heading that sorts.
+ *
+ * A button inside the th rather than a click handler on it, so it is reachable
+ * by keyboard and announces itself; `aria-sort` on the th is what a screen
+ * reader reads to say which column the table is ordered by.
+ */
+function SortTh({
+  sort, onSort, col, className, label, short, title,
+}: {
+  sort: SortState
+  onSort: (key: SortKey) => void
+  col: SortKey
+  className: string
+  label: string
+  short?: string
+  title?: string
+}) {
+  const active = sort.key === col
+  return (
+    <th
+      className={`${className}${active ? ' sorted' : ''}`}
+      aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+      title={title}
+    >
+      <button type="button" className="th-sort" onClick={() => onSort(col)}>
+        {short
+          ? <><span className="c-off-full">{label}</span><span className="c-off-abbr">{short}</span></>
+          : label}
+        <span className="th-arrow" aria-hidden>{active ? (sort.dir === 'asc' ? '▲' : '▼') : ''}</span>
+      </button>
+    </th>
+  )
+}
+
 function Row({ product, paid }: { product: Product; paid?: LastPaid }) {
   const meta = categoryMeta(product.category)
   const food = foodMeta(product.foodKey)
@@ -285,10 +360,19 @@ function Row({ product, paid }: { product: Product; paid?: LastPaid }) {
 
   return (
     <tr className={`krow${product.barcode ? '' : ' spent'}`}>
+      <td className="c-pic">
+        <Glyph emoji={meta.emoji} photoId={product.photoId} size={30} rounded />
+      </td>
+
       <td className="k-name">
         <span className="nm">{product.name}</span>
         {product.brand && <span className="chip">{product.brand}</span>}
-        {food && <span className="chip"><span className="dot" />{food.name}</span>}
+      </td>
+
+      <td className="c-food">
+        {food
+          ? <><span aria-hidden>{food.icon}</span> <span>{food.name}</span></>
+          : <span className="muted">—</span>}
       </td>
 
       <td className="k-cat">
