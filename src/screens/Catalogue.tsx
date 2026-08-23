@@ -3,7 +3,6 @@ import type { Product } from '../db/schema'
 import { useProducts } from '../app/data'
 import { categoryMeta } from '../lib/categories'
 import { foodMeta } from '../lib/foods'
-import { formatDate } from '../lib/dates'
 import { offLabel, searchProducts, sweepOpenFoodFacts, type SweepProgress } from '../lib/products'
 import { CatDot, Empty, Seg } from '../components/ui'
 import { useToast } from '../app/toast'
@@ -16,6 +15,10 @@ import { useToast } from '../app/toast'
  * hummus does not stop you being a household that buys hummus, and the next
  * receipt saying 343825 needs somewhere that remembers what that is.
  *
+ * **Identity only.** It holds no counts and no prices: how often something is
+ * bought and what it cost belong to purchases, and every purchase is an `Item`
+ * that already records both. Trips and Insights answer those.
+ *
  * Built as a table because the questions asked of it are comparisons down a
  * column — which of these have I scanned, which does Open Food Facts know,
  * what do I buy most — and aligned columns answer those far faster than a
@@ -25,17 +28,18 @@ import { useToast } from '../app/toast'
  */
 
 type View = 'all' | 'unscanned' | 'scanned'
-type SortKey = 'bought' | 'name' | 'sku' | 'price'
-
-const money = (n: number) => `$${n.toFixed(2)}`
+/**
+ * No sort by "most bought" or "last paid" — the catalogue does not know either,
+ * on purpose. Those are facts about purchases, and Trips and Insights answer
+ * them from the record that owns them.
+ */
+type SortKey = 'name' | 'sku' | 'category'
 
 function compare(a: Product, b: Product, key: SortKey): number {
   switch (key) {
-    case 'name': return a.name.localeCompare(b.name)
-    case 'sku': return (a.sku ?? '').localeCompare(b.sku ?? '') || a.name.localeCompare(b.name)
-    case 'price': return (b.lastPrice ?? -1) - (a.lastPrice ?? -1) || a.name.localeCompare(b.name)
-    // Most-bought first: a catalogue's useful default is what you actually eat.
-    default: return b.timesBought - a.timesBought || a.name.localeCompare(b.name)
+    case 'sku': return (a.sku ?? '\uffff').localeCompare(b.sku ?? '\uffff') || a.name.localeCompare(b.name)
+    case 'category': return a.category.localeCompare(b.category) || a.name.localeCompare(b.name)
+    default: return a.name.localeCompare(b.name)
   }
 }
 
@@ -43,7 +47,7 @@ export default function Catalogue() {
   const products = useProducts()
   const toast = useToast()
   const [view, setView] = useState<View>('all')
-  const [sort, setSort] = useState<SortKey>('bought')
+  const [sort, setSort] = useState<SortKey>('name')
   const [query, setQuery] = useState('')
   const [sweep, setSweep] = useState<SweepProgress | null>(null)
   const cancelRef = useRef({ cancelled: false })
@@ -155,10 +159,9 @@ export default function Catalogue() {
               <label className="field" style={{ flex: 'none', minWidth: 130 }}>
                 <span>Sort</span>
                 <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
-                  <option value="bought">Bought most</option>
                   <option value="name">Name A–Z</option>
                   <option value="sku">Item number</option>
-                  <option value="price">Last price</option>
+                  <option value="category">Category</option>
                 </select>
               </label>
             </div>
@@ -218,8 +221,9 @@ export default function Catalogue() {
                       <span className="c-off-full">Open Food Facts</span>
                       <span className="c-off-abbr">OFF</span>
                     </th>
-                    <th className="c-bought">Bought</th>
-                    <th className="k-qty">Last paid</th>
+                    {/* Pack size, not stock: what one of them contains. How many
+                        you have is the Kitchen's question, not this table's. */}
+                    <th className="c-size">Size</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -276,14 +280,10 @@ function Row({ product }: { product: Product }) {
         </span>
       </td>
 
-      <td className="c-bought tabular">
-        {product.timesBought > 0
-          ? <><span>{product.timesBought}×</span>{product.lastBoughtAt && <small>{formatDate(product.lastBoughtAt)}</small>}</>
+      <td className="c-size tabular">
+        {product.size != null
+          ? <span>{product.size}{product.sizeUnit ? ` ${product.sizeUnit}` : ''}</span>
           : <span className="muted">—</span>}
-      </td>
-
-      <td className="k-qty tabular">
-        {product.lastPrice != null ? money(product.lastPrice) : <span className="muted">—</span>}
       </td>
     </tr>
   )

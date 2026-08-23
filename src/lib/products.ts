@@ -134,7 +134,6 @@ export async function upsertProduct(draft: ProductDraft): Promise<Product> {
     size: draft.size,
     sizeUnit: draft.sizeUnit,
     nutrition: draft.nutrition,
-    timesBought: 0,
     createdAt: todayISO(),
   }
   const id = await db.products.add(row)
@@ -271,28 +270,16 @@ export async function sweepOpenFoodFacts(
   return state
 }
 
-/** Bookkeeping, so the catalogue can be sorted by what actually gets bought. */
-export async function recordPurchase(
-  productId: number,
-  opts: { price?: number; date?: string; qty?: number } = {},
-): Promise<void> {
-  const product = await db.products.get(productId)
-  if (!product) return
-  await db.products.update(productId, {
-    timesBought: (product.timesBought ?? 0) + (opts.qty ?? 1),
-    lastBoughtAt: opts.date ?? todayISO(),
-    lastPrice: opts.price ?? product.lastPrice,
-  })
-}
-
 // ---------------------------------------------------------------------------
 // Reading the catalogue
 // ---------------------------------------------------------------------------
 
+/**
+ * Alphabetical, because the catalogue no longer knows what gets bought most —
+ * that is a question about purchases, and `items` answers it.
+ */
 export function sortProducts(list: Product[]): Product[] {
-  return [...list].sort(
-    (a, b) => b.timesBought - a.timesBought || a.name.localeCompare(b.name),
-  )
+  return [...list].sort((a, b) => a.name.localeCompare(b.name))
 }
 
 /** Everything still waiting on its one-time scan, most-bought first. */

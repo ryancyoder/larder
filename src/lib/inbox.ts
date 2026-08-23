@@ -8,7 +8,7 @@ import { addItem } from './inventory'
 import { suggestExpiry, suggestPlace } from './locations'
 import { titleCase } from './match'
 import { todayISO } from './dates'
-import { learnBarcode, recordPurchase, upsertProduct } from './products'
+import { learnBarcode, upsertProduct } from './products'
 
 /**
  * Unpacking the shopping.
@@ -256,10 +256,6 @@ export async function confirmInbox(
     // it under the trip it actually arrived on.
     tripId: row.tripId,
   })
-
-  if (product.id != null) {
-    await recordPurchase(product.id, { price: row.price, qty })
-  }
 
   // Clear the row without deleting the photo — the item owns it now.
   await db.inbox.delete(row.id)

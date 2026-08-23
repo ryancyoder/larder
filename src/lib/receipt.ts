@@ -3,7 +3,7 @@ import type { Category, InboxItem, Nutrition, Trip, Unit } from '../db/schema'
 import { addItem } from './inventory'
 import { suggestExpiry, suggestPlace } from './locations'
 import { todayISO } from './dates'
-import { recordPurchase, upsertProduct } from './products'
+import { upsertProduct } from './products'
 
 /**
  * Reading a till receipt.
@@ -951,9 +951,6 @@ export async function commitReceipt(
       productId: product.id,
       tripId,
     })
-    if (product.id != null) {
-      await recordPurchase(product.id, { price: line.price, date: trip.date, qty: line.qty })
-    }
     added++
   }
 
