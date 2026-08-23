@@ -9,19 +9,24 @@ import { useCategories, useKitchen, useShopList } from './app/data'
 import { expiringSoon } from './lib/inventory'
 import Kitchen from './screens/Kitchen'
 import Foods from './screens/Foods'
+import Catalogue from './screens/Catalogue'
 import Planning from './screens/Planning'
 import Recipes from './screens/Recipes'
 import Shop from './screens/Shop'
 import Insights from './screens/Insights'
 import Settings from './screens/Settings'
 
-type Tab = 'kitchen' | 'foods' | 'plan' | 'recipes' | 'shop' | 'insights'
+type Tab = 'kitchen' | 'foods' | 'catalogue' | 'plan' | 'recipes' | 'shop' | 'insights'
 
 const TABS: Array<{ key: Tab; label: string; glyph: string }> = [
   { key: 'kitchen', label: 'Kitchen', glyph: '🧊' },
   // Next to the kitchen because it is the same shelf asked about differently:
   // products there, the foods they are here.
   { key: 'foods', label: 'Foods', glyph: '🥕' },
+  // Third view of the same shelf: the Kitchen has products as stock, Foods has
+  // what they are, and this has their identity — one row per thing you buy,
+  // however many times you buy it.
+  { key: 'catalogue', label: 'Catalogue', glyph: '📇' },
   { key: 'plan', label: 'Plan', glyph: '🗓️' },
   { key: 'recipes', label: 'Recipes', glyph: '🍳' },
   { key: 'shop', label: 'Shop', glyph: '🛒' },
@@ -138,6 +143,7 @@ function Shell() {
             <>
               {tab === 'kitchen' && <Kitchen onOpenSettings={() => setSettingsOpen(true)} />}
               {tab === 'foods' && <Foods />}
+              {tab === 'catalogue' && <Catalogue />}
               {tab === 'plan' && <Planning />}
               {tab === 'recipes' && <Recipes onOpenSettings={() => setSettingsOpen(true)} />}
               {tab === 'shop' && <Shop />}

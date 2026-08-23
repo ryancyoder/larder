@@ -83,8 +83,17 @@ The complaint that motivated this table was really about duplicates, not disappe
 - `lib/products.ts` holds the logic: `productByCode`, `upsertProduct` (fills gaps, never
   overwrites — a name from a person or from Open Food Facts beats a till abbreviation, and
   re-importing an old receipt must not undo either), `learnBarcode`, `recordPurchase`.
-- **Settings → Everything you buy** browses it, with a *Needs a scan* filter that is the
-  working list of products still wearing a till abbreviation.
+- **The Catalogue tab** browses it — a table of Product / Category / SKU / Barcode / OFF /
+  Bought / Last paid, with filters for *To scan* and *Scanned*. Built for a landscape iPad,
+  which is where several hundred products are readable; the *Bought* column drops under
+  900px and *SKU* under 620px, leaving a phone with what it is, its code, and whether the
+  database knows it.
+- **`products.off_status`** (`0006`) records what Open Food Facts said, rather than the
+  catalogue inferring it from whether `nutrition` came back — which is wrong both ways, since
+  a listed product may declare nothing worth storing and nutrition can be typed by hand.
+  Three states, and the absent one means something: null is *never asked* (no barcode yet),
+  `'missing'` is a settled answer. At ALDI `'missing'` is the expected result and must not
+  read as outstanding work.
 
 Trips are listed under **Shop → Previous trips** (all of them, newest first, tappable into
 `TripSheet`, with a count of rows still waiting on a barcode). Insights keeps its own
@@ -436,6 +445,13 @@ trigger *and* revisit the join screen.
 
 - **`npm run build` typechecks**, so run it before committing — it catches what a dev
   server won't.
+- **The static-harness trick works, and now has a script.** The catalogue table was checked
+  before shipping by copying the built `dist/assets/index-*.css` beside a hand-written HTML
+  page of real markup and screenshotting it in Chromium at 1180×820 and 390×844 —
+  asserting `body.scrollWidth <= innerWidth` and reading back which `<th>`s survived each
+  breakpoint. `npm i --no-save playwright`, and the browser is already at
+  `/opt/pw-browsers/chromium`. Far quicker than a React harness and it catches the thing
+  that actually goes wrong, which is layout.
 - **Verifying UI without auth is awkward.** The Kitchen needs a session and data. A React
   harness failed (the category registry loads during app boot, which the harness bypassed);
   what worked was rendering the real markup against the real stylesheet in a throwaway page
