@@ -97,6 +97,8 @@ export default function EditItemSheet({ item, onClose }: { item: ItemView; onClo
       location,
       expiresAt: expiresAt || undefined,
       price: price.trim() ? Number(price) : undefined,
+      // Written to the item as the fallback for stock with no catalogue entry;
+      // when there is one, the product below is what actually takes effect.
       isStaple,
       parQty: isStaple ? Number(parQty) || 1 : undefined,
       brand: brand.trim() || undefined,
@@ -104,6 +106,14 @@ export default function EditItemSheet({ item, onClose }: { item: ItemView; onClo
       // Belt and braces: the control prevents it, the write enforces it.
       isMain: isMain && mainAllowedFor(meal) ? true : undefined,
     })
+
+    // The catalogue is the source of truth for staple-ness, so an item linked
+    // to a product writes it there too — otherwise starring this carton would
+    // leave the next one unstarred.
+    if (item.productId != null) {
+      const { setProductStaple } = await import('../lib/products')
+      await setProductStaple(item.productId, isStaple, Number(parQty) || 1)
+    }
 
     // Quantity goes through the ledger path so the correction is recorded, and
     // so any hold too big for the new count gets trimmed. On a restatement it

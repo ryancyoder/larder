@@ -43,7 +43,7 @@ export function unitPrice(item: Item): number {
 export function buildViews(
   items: Item[],
   reservations: Reservation[],
-  catalogue?: Map<number, { name?: string; photoId?: number }>,
+  catalogue?: Map<number, { name?: string; photoId?: number; isStaple?: boolean; parQty?: number }>,
 ): ItemView[] {
   const byItem = new Map<number, Reservation[]>()
   for (const r of reservations) {
@@ -64,6 +64,12 @@ export function buildViews(
       available: Math.max(0, item.qty - reserved),
       displayName: master?.name?.trim() || item.name,
       displayPhotoId: master?.photoId ?? item.photoId,
+      // Overridden rather than shadowed, unlike the name and the picture. Those
+      // are display choices with a sensible per-item answer; this is a decision
+      // about the product, and every consumer — the shopping list included —
+      // should be following the catalogue's version of it.
+      isStaple: master ? Boolean(master.isStaple) : item.isStaple,
+      parQty: master ? master.parQty : item.parQty,
     }
   })
 }

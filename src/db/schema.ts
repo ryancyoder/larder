@@ -248,6 +248,17 @@ export interface Product {
    * typed in by hand.
    */
   offStatus?: 'found' | 'missing'
+  /**
+   * Kept in stock as a matter of course, with `parQty` as the level to rebuy
+   * below.
+   *
+   * On the product rather than the item because "we always keep milk in" is a
+   * fact about milk. Held per item it had to be re-decided on every carton,
+   * and two cartons of the same thing could disagree — one starred, one not,
+   * with the shopping list following whichever it read first.
+   */
+  isStaple: boolean
+  parQty?: number
   createdAt: string
 }
 
