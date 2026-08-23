@@ -1265,6 +1265,85 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
    Tile size. Regular is the default; Large trades columns for reach.
    -------------------------------------------------------------------------- */
 
+/* --------------------------------------------------------------------------
+   Borderless tiles. The frame comes off and the pack shots float.
+   -------------------------------------------------------------------------- */
+
+/* A card around a cutout PNG is drawing a box around something that already
+   has its own edges. With the frame gone the products sit straight on the
+   background and the shelf reads as objects rather than as a table.
+
+   A rectangular pack shot letterboxes instead of floating, which is the honest
+   result of not having a cutout, and is the visible reason to go and cut one. */
+.pos-grid.bare .pos-tile {
+  background: none;
+  border-color: transparent;
+  border-radius: 0;
+  /* Taller than the framed square. A square tile minus its caption leaves a
+     letterbox, and a bottle fitted into a letterbox is fitted to its height —
+     so it shrinks and strands empty space either side. Groceries stand up;
+     giving the tile a portrait shape is what lets the product be big. Only
+     slightly portrait, though: every bit of height is a row you can no longer
+     see, and this view exists to show a shelf at a glance. */
+  aspect-ratio: 4 / 5;
+}
+
+/* The framed tile stacks the caption *on* the picture and relies on a scrim to
+   stay readable. Take the scrim away and a tall jar runs straight through its
+   own name — so bare tiles stop stacking and put the two in normal flow: the
+   picture takes the space that is left, the caption takes what it needs. That
+   holds for a two-line name as readily as a one-line one, which a fixed strip
+   of reserved padding does not. */
+.pos-grid.bare .pos-tile.has-photo {
+  padding: 10px 6px 7px;
+  justify-content: flex-start;
+}
+.pos-grid.bare .pos-fill {
+  position: relative;
+  inset: auto;
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  object-fit: contain;
+  /* Sit them on the floor of the box rather than centred in it. Centring puts
+     a short jar in the middle of its space and strands its caption a long way
+     underneath; on a common baseline every product stands on the same shelf
+     and its name is directly beneath it. */
+  object-position: center bottom;
+}
+/* The framed cutout reserves a strip at the foot for the caption it is stacked
+   under. Bare tiles are not stacked, so that strip is just a gap — and because
+   this rule out-specifies the one above, leaving it would float cutouts off the
+   baseline while ordinary pack shots sat on it. Same box for both. */
+.pos-grid.bare .pos-tile.has-cutout .pos-fill { padding: 0 4px; }
+
+.pos-grid.bare .pos-tile.has-photo .pos-label {
+  position: static;
+  padding: 7px 2px 0;
+  background: none;
+}
+.pos-grid.bare .pos-tile.has-photo .pos-name,
+.pos-grid.bare .pos-tile.has-photo .pos-meta { text-shadow: none; }
+.pos-grid.bare .pos-tile.has-photo .pos-name { color: var(--text); }
+.pos-grid.bare .pos-tile.has-photo .pos-meta { color: var(--text-mute); }
+
+/* The dashes were the whole of this tile's shape, so without a border it needs
+   its own. A faint plate keeps "Everything" a place you can aim at. */
+.pos-grid.bare .pos-tile-quiet {
+  background: var(--bg-1);
+  border-radius: var(--r-lg);
+}
+
+/* Selection had been carried by the border colour and the tinted background,
+   and there is now neither. It gets a shape back — but only while it is on,
+   which is the one moment a shape is worth drawing. On a cutout the wash shows
+   through the transparent margin, so it reads without covering the product. */
+.pos-grid.bare .pos-tile.on {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  border-radius: var(--r-lg);
+}
+.pos-grid.bare .pos-tile.has-photo.on::after { display: none; }
+
 /* A small tile shows what a thing is and how much is left, and nothing else.
    Four overlay toggles — meal, main, hold, staple — on a tile that size are
    more clutter than control, and every one of them is also on the item sheet a

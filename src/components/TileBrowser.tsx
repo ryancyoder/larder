@@ -21,8 +21,19 @@ import { Seg } from './ui'
 export type Filter = 'all' | 'low' | 'empty' | 'expiring' | 'staples' | 'reserved' | 'free' | 'main' | MealSlot
 export type Sort = 'name' | 'low' | 'expiring'
 type TileSize = 'regular' | 'large'
+/** Whether a tile is drawn as a card or as the product on its own. */
+type TileStyle = 'framed' | 'bare'
 
 const SIZE_KEY = 'larder-tile-size'
+const STYLE_KEY = 'larder-tile-style'
+
+function readStyle(): TileStyle {
+  try {
+    return localStorage.getItem(STYLE_KEY) === 'bare' ? 'bare' : 'framed'
+  } catch {
+    return 'framed'
+  }
+}
 
 function readSize(): TileSize {
   try {
@@ -97,6 +108,17 @@ export default function TileBrowser({
   const [sort, setSort] = useState<Sort>('name')
   const [query, setQuery] = useState('')
   const [size, setSize] = useState<TileSize>(readSize)
+  const [style, setStyle] = useState<TileStyle>(readStyle)
+
+  function toggleStyle() {
+    const next: TileStyle = style === 'framed' ? 'bare' : 'framed'
+    setStyle(next)
+    try {
+      localStorage.setItem(STYLE_KEY, next)
+    } catch {
+      // Same as size: the session still respects it, it just won't outlive one.
+    }
+  }
 
   function toggleSize() {
     const next: TileSize = size === 'regular' ? 'large' : 'regular'
@@ -157,7 +179,16 @@ export default function TileBrowser({
           <div className="pos-sub">{placeKey ? itemHint(visible.length) : hint}</div>
         </div>
 
-        {/* Labelled with what it switches to, so the toggle needs no legend. */}
+        {/* Both labelled with what they switch to, so neither needs a legend.
+            Size and style are independent — bare tiles come in both sizes. */}
+        <button
+          className="pos-size"
+          onClick={toggleStyle}
+          aria-label={style === 'framed' ? 'Switch to borderless tiles' : 'Switch to framed tiles'}
+        >
+          {style === 'framed' ? 'Bare' : 'Frame'}
+        </button>
+
         <button
           className="pos-size"
           onClick={toggleSize}
@@ -180,7 +211,7 @@ export default function TileBrowser({
         </div>
       )}
 
-      <div className={`pos-grid${size === 'large' ? ' large' : ''}`}>
+      <div className={`pos-grid${size === 'large' ? ' large' : ''}${style === 'bare' ? ' bare' : ''}`}>
         {!placeKey ? (
           <>
             {places.map((p) => (
