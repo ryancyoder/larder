@@ -1,14 +1,15 @@
 import { useMemo, useState } from 'react'
-import type { ShopItem } from '../db/schema'
-import { useCategories, useAllStock, usePlan, useRecipes, useShopList, useTrips } from '../app/data'
+import type { ShopItem, Trip } from '../db/schema'
+import { useCategories, useAllStock, useInbox, usePlan, useRecipes, useShopList, useTrips } from '../app/data'
 import { categoryMeta, guessCategory } from '../lib/categories'
 import { addGeneratedLines, checkout, generateList, type GeneratedLine } from '../lib/shopping'
 import { formatAmount } from '../lib/units'
 import { titleCase } from '../lib/match'
 import { db } from '../db/db'
-import { daysBetween, todayISO } from '../lib/dates'
+import { daysBetween, formatDate, todayISO } from '../lib/dates'
 import { CatDot, Empty, Field, Section, Sheet } from '../components/ui'
 import QuickAdd from './QuickAdd'
+import TripSheet from '../components/TripSheet'
 import { useToast } from '../app/toast'
 
 export default function Shop() {
@@ -18,11 +19,14 @@ export default function Shop() {
   const list = useShopList()
   const cats = useCategories()
   const trips = useTrips()
+  const inbox = useInbox()
   const toast = useToast()
 
   const [draft, setDraft] = useState('')
   const [checkingOut, setCheckingOut] = useState(false)
   const [walking, setWalking] = useState(false)
+  const [openTrip, setOpenTrip] = useState<Trip | null>(null)
+  const [allTrips, setAllTrips] = useState(false)
 
   const suggestions = useMemo(() => {
     if (!stock || !plan || !recipes || !list) return []
@@ -45,8 +49,18 @@ export default function Shop() {
   const ticked = list.filter((i) => i.checked)
   const estimate = ticked.reduce((sum, i) => sum + (i.estPrice ?? 0), 0)
 
-  const lastTrip = trips?.length ? [...trips].sort((a, b) => b.date.localeCompare(a.date))[0] : null
+  // Newest first, and by id within a day: two shops on one date still happened
+  // in an order, and the date alone cannot say which.
+  const history = [...(trips ?? [])].sort(
+    (a, b) => b.date.localeCompare(a.date) || (b.id ?? 0) - (a.id ?? 0),
+  )
+  const lastTrip = history[0] ?? null
   const sinceLast = lastTrip ? daysBetween(lastTrip.date, todayISO()) : null
+  const shown = allTrips ? history : history.slice(0, 8)
+
+  /** Rows from a shop still waiting on their one-time barcode scan. */
+  const waiting = (tripId: number | undefined) =>
+    (inbox ?? []).filter((r) => r.tripId === tripId && !r.barcode).length
 
   async function quickAdd() {
     const name = draft.trim()
@@ -166,6 +180,52 @@ export default function Shop() {
           </Section>
         ))
       )}
+
+      {history.length > 0 && (
+        <Section
+          title="Previous trips"
+          hint={history.length > 1 ? `${history.length} shops` : undefined}
+          action={
+            history.length > 8 ? (
+              <button className="btn ghost sm" onClick={() => setAllTrips((v) => !v)}>
+                {allTrips ? 'Show fewer' : `Show all ${history.length}`}
+              </button>
+            ) : undefined
+          }
+        >
+          <div className="stack auto-cols" style={{ gap: 6 }}>
+            {shown.map((trip) => {
+              const left = waiting(trip.id)
+              return (
+                <button
+                  className="item"
+                  key={trip.id}
+                  onClick={() => setOpenTrip(trip)}
+                  style={{ padding: '9px 12px', width: '100%', textAlign: 'left', cursor: 'pointer' }}
+                >
+                  <span style={{ fontSize: 18, flex: 'none', width: 26, textAlign: 'center' }}>
+                    {trip.source === 'scan' ? '⚡' : trip.source === 'receipt' ? '🧾' : '🛒'}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="name" style={{ fontSize: 14 }}>{trip.store || 'Shopping trip'}</div>
+                    <div className="meta">
+                      <span>{formatDate(trip.date)}</span>
+                      <span>·</span>
+                      <span>{trip.itemCount} item{trip.itemCount === 1 ? '' : 's'}</span>
+                      {left > 0 && <><span>·</span><span>{left} to scan</span></>}
+                    </div>
+                  </div>
+                  {/* A scanned shop never saw a price, so "$0.00" would read as
+                      free rather than as unknown. */}
+                  <div className="qty">{trip.total > 0 ? `$${trip.total.toFixed(2)}` : '—'}</div>
+                </button>
+              )
+            })}
+          </div>
+        </Section>
+      )}
+
+      {openTrip && <TripSheet trip={openTrip} onClose={() => setOpenTrip(null)} />}
 
       {checkingOut && (
         <CheckoutSheet items={ticked} onClose={() => setCheckingOut(false)} />

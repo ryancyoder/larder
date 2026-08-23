@@ -86,6 +86,10 @@ The complaint that motivated this table was really about duplicates, not disappe
 - **Settings → Everything you buy** browses it, with a *Needs a scan* filter that is the
   working list of products still wearing a till abbreviation.
 
+Trips are listed under **Shop → Previous trips** (all of them, newest first, tappable into
+`TripSheet`, with a count of rows still waiting on a barcode). Insights keeps its own
+*Recent trips* block, which is the aggregate view rather than the history.
+
 Barcode detection is now strict about length — 8, 12, 13 or 14 digits, the lengths that
 actually exist. Anything else is a till code. Sam's Club prints nine-digit item numbers that
 used to sail through as barcodes and would have fetched a confident answer about a
