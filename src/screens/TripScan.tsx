@@ -79,10 +79,21 @@ export default function TripScan({ trip, onClose }: { trip: Trip; onClose: () =>
   const current = list.find((r) => r.id === currentId)
   const stats = progress(list, doneIds)
 
-  // Read through refs so the scanner callback stays stable — rebuilding it
-  // tears down the camera, and a session here can run for several minutes.
-  const stateRef = useRef({ list, current, doneIds })
-  useEffect(() => { stateRef.current = { list, current, doneIds } }, [list, current, doneIds])
+  /**
+   * Everything the scanner callback reads, held in a ref.
+   *
+   * `onCode` is a dependency of the effect that owns the camera, so anything in
+   * its closure that changes identity restarts the stream. `rows` is the
+   * dangerous one: `useInbox` re-runs on *any* write (see app/live.ts — the
+   * subscription is deliberately coarse), so each scan's own `applyBarcode`
+   * hands back a fresh array. Depending on it directly meant every successful
+   * scan tore the camera down and rebuilt it, which looks exactly like the
+   * `key`-on-the-video bug in HANDOFF §5 and is the other of its two causes.
+   */
+  const stateRef = useRef({ list, current, doneIds, rows })
+  useEffect(() => {
+    stateRef.current = { list, current, doneIds, rows }
+  }, [list, current, doneIds, rows])
 
   const onCode = useCallback((code: string) => {
     const clean = code.replace(/\D/g, '')
@@ -103,7 +114,7 @@ export default function TripScan({ trip, onClose }: { trip: Trip; onClose: () =>
         const hit = matchScan(waiting, cursor, found?.name)
         if (!hit) { setBusy(false); return }
 
-        const row = rows?.find((r) => r.id === hit.row.id)
+        const row = stateRef.current.rows?.find((r) => r.id === hit.row.id)
         if (!row) { setBusy(false); return }
 
         // Writes the barcode onto the *product*, which is the lasting part:
@@ -128,7 +139,22 @@ export default function TripScan({ trip, onClose }: { trip: Trip; onClose: () =>
         setBusy(false)
       })
       .catch(() => { beep(false); setBusy(false) })
-  }, [beep, rows])
+    // `beep` only: every other value this reads comes through stateRef, so the
+    // callback identity never changes and the camera is started exactly once.
+  }, [beep])
+
+  /**
+   * The callback, held in a ref so the camera effect can depend on nothing.
+   *
+   * A black viewport has two causes and they look identical (HANDOFF §5). One
+   * is a changing React `key` above the <video>. The other is this effect
+   * re-running: its cleanup stops the stream, and anything unstable in its
+   * dependencies — a prop redefined each render, a live query that re-runs on
+   * every write — restarts the camera underneath you. Depending on nothing at
+   * all is the only version that cannot regress.
+   */
+  const onCodeRef = useRef(onCode)
+  onCodeRef.current = onCode
 
   useEffect(() => {
     let cancelled = false
@@ -136,7 +162,7 @@ export default function TripScan({ trip, onClose }: { trip: Trip; onClose: () =>
       const video = videoRef.current
       if (!video) return
       try {
-        const handle = await startScanner(video, onCode, { continuous: true })
+        const handle = await startScanner(video, (code) => onCodeRef.current(code), { continuous: true })
         if (cancelled) { handle.stop(); return }
         handleRef.current = handle
       } catch (err) {
@@ -148,7 +174,8 @@ export default function TripScan({ trip, onClose }: { trip: Trip; onClose: () =>
       handleRef.current?.stop()
       handleRef.current = null
     }
-  }, [onCode])
+    // Mount only. See the note on onCodeRef above.
+  }, [])
 
   /** Puts everything scanned this session onto the shelf, under this trip. */
   async function finish() {
