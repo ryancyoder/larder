@@ -120,6 +120,21 @@ export async function productByCode(code: StoreCode): Promise<Product | undefine
   return rows.find((p) => storeKey(p.store) === storeKey(code.store))
 }
 
+/**
+ * Last-resort match, for a product with neither a barcode nor a till code.
+ *
+ * Same name means same product, which is right for a household: adding
+ * "Popcorn" by hand twice should not leave two entries. Only consulted when
+ * there is no identifier at all — a *new* till code is a new product even if
+ * the name collides, because two shops name things independently.
+ */
+export async function productByName(name: string): Promise<Product | undefined> {
+  const key = name.trim().toLowerCase()
+  if (!key) return undefined
+  const rows = await db.products.toArray()
+  return rows.find((p) => p.name.trim().toLowerCase() === key)
+}
+
 export async function productByBarcode(barcode: string): Promise<Product | undefined> {
   const clean = barcode.replace(/\D/g, '')
   if (!clean) return undefined
@@ -163,7 +178,8 @@ export async function upsertProduct(draft: ProductDraft): Promise<Product> {
 
   const existing =
     (barcode ? await productByBarcode(barcode) : undefined) ??
-    (sku ? await productByCode({ store: draft.store ?? '', sku }) : undefined)
+    (sku ? await productByCode({ store: draft.store ?? '', sku }) : undefined) ??
+    (!barcode && !sku ? await productByName(draft.name) : undefined)
 
   if (existing?.id != null) {
     const patch: Partial<Product> = {}

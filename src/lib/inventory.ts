@@ -244,7 +244,33 @@ export async function addItem(item: Omit<Item, 'id'>): Promise<number> {
     ? item
     : { ...item, foodKey: matchFood(item.name, item.brand) }
 
-  const id = await db.items.add(filed as Item)
+  // Nothing reaches a shelf without a catalogue entry.
+  //
+  // Callers that already know the product pass one — receipt import, the inbox.
+  // The rest did not, and left stock the catalogue had never heard of: a manual
+  // add, a shopping-list checkout and the rapid scanner between them orphaned
+  // 24 of 67 items before this existed. Doing it here rather than in each
+  // caller means no future one can forget either.
+  //
+  // Imported lazily: products.ts imports from this module, and a static cycle
+  // would leave one of the two half-initialised.
+  let productId = filed.productId
+  if (productId == null) {
+    const { upsertProduct } = await import('./products')
+    const product = await upsertProduct({
+      name: filed.name,
+      brand: filed.brand,
+      barcode: filed.barcode,
+      category: filed.category,
+      unit: filed.unit,
+      size: filed.size,
+      sizeUnit: filed.sizeUnit,
+      nutrition: filed.nutrition,
+    })
+    productId = product.id
+  }
+
+  const id = await db.items.add({ ...filed, productId } as Item)
   if (item.price) {
     await db.events.add({
       type: 'purchase',
