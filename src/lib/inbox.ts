@@ -8,6 +8,7 @@ import { addItem } from './inventory'
 import { suggestExpiry, suggestPlace } from './locations'
 import { titleCase } from './match'
 import { todayISO } from './dates'
+import { learnBarcode, recordPurchase, upsertProduct } from './products'
 
 /**
  * Unpacking the shopping.
@@ -133,6 +134,29 @@ export async function applyBarcode(
   const barcode = raw.replace(/\D/g, '')
   if (!barcode) return { ok: false }
 
+  // The one-time scan behind the whole product catalogue.
+  //
+  // A row that arrived from a receipt already has a catalogue entry keyed on
+  // the till's item number, and that entry is what the scan is really for: the
+  // barcode lands on the *product*, not just on this row, so the next receipt
+  // carrying the same number resolves without anybody being asked again.
+  if (row.productId != null) {
+    const { product, named } = await learnBarcode(row.productId, barcode)
+    await db.inbox.update(row.id, {
+      barcode,
+      name: product?.name ?? row.name,
+      brand: product?.brand ?? row.brand,
+      category: product?.category ?? row.category,
+      nutrition: product?.nutrition ?? row.nutrition,
+      scanned: true,
+      guessSource: 'barcode',
+      guessNote: named
+        ? undefined
+        : 'Barcode saved against this product — not in Open Food Facts, so name it yourself',
+    })
+    return { ok: named, name: product?.name ?? row.name }
+  }
+
   const found = await lookupBarcode(barcode).catch(() => null)
   await db.inbox.update(row.id, {
     barcode,
@@ -194,6 +218,20 @@ export async function confirmInbox(
   const qty = overrides.qty ?? row.qty ?? 1
   const unit = overrides.unit ?? row.unit ?? 'ea'
 
+  // Every confirmed row earns a catalogue entry, however it arrived. A photo
+  // named by hand is still this household deciding what a product is called,
+  // and that is worth keeping once rather than re-deciding every time.
+  const product = await upsertProduct({
+    name,
+    brand: row.brand,
+    barcode: row.barcode,
+    store: row.store,
+    sku: row.sku,
+    category,
+    unit,
+    nutrition: row.nutrition,
+  })
+
   const itemId = await addItem({
     name,
     category,
@@ -201,6 +239,9 @@ export async function confirmInbox(
     qty,
     qtyInitial: qty,
     unit,
+    // The receipt already knew what it cost; without this the ledger would
+    // record a purchase of nothing.
+    price: row.price,
     purchasedAt: todayISO(),
     expiresAt: suggestExpiry(places, category, location),
     isStaple: false,
@@ -209,7 +250,16 @@ export async function confirmInbox(
     barcode: row.barcode,
     brand: row.brand,
     nutrition: row.nutrition,
+    foodKey: product.foodKey,
+    productId: product.id,
+    // Set when the row came off a scanned shop, so naming it late still files
+    // it under the trip it actually arrived on.
+    tripId: row.tripId,
   })
+
+  if (product.id != null) {
+    await recordPurchase(product.id, { price: row.price, qty })
+  }
 
   // Clear the row without deleting the photo — the item owns it now.
   await db.inbox.delete(row.id)

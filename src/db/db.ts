@@ -2,7 +2,7 @@ import { supabase } from '../lib/supabase'
 import { Table, bump, getHouseholdId } from './remote'
 import type {
   Item, Reservation, Recipe, PlanEntry, ShopItem, Trip, LedgerEvent, Photo, StoragePlace,
-  StorageCategory, MealDay, Combo, Person, Setting, InboxItem,
+  StorageCategory, MealDay, Combo, Person, Setting, InboxItem, Product,
 } from './schema'
 
 /**
@@ -18,6 +18,7 @@ import type {
  */
 class LarderDB {
   items = new Table<Item>('items')
+  products = new Table<Product>('products')
   reservations = new Table<Reservation>('reservations')
   recipes = new Table<Recipe>('recipes')
   plan = new Table<PlanEntry>('plan_entries')

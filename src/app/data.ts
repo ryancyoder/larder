@@ -5,7 +5,7 @@ import { sortPlaces } from '../lib/locations'
 import { setCategoryRegistry, sortCategories } from '../lib/categories'
 import { sortPeople } from '../lib/people'
 import type {
-  Combo, InboxItem, ItemView, LedgerEvent, MealDay, Person, PlanEntry, Recipe, ShopItem, StorageCategory, StoragePlace, Trip,
+  Combo, InboxItem, ItemView, LedgerEvent, MealDay, Person, PlanEntry, Product, Recipe, ShopItem, StorageCategory, StoragePlace, Trip,
 } from '../db/schema'
 
 /** Live views over IndexedDB. Every screen reads through these, never the tables directly. */
@@ -63,8 +63,35 @@ export function useShopList(): ShopItem[] | undefined {
   return useLiveQuery(() => db.shop.toArray(), [])
 }
 
+/**
+ * The product catalogue — identity rather than stock, so it does not shrink
+ * when the food is eaten.
+ */
+export function useProducts(): Product[] | undefined {
+  return useLiveQuery(() => db.products.toArray(), [])
+}
+
 export function useTrips(): Trip[] | undefined {
   return useLiveQuery(() => db.trips.toArray(), [])
+}
+
+/**
+ * What one shop brought home, holds resolved.
+ *
+ * Reads items rather than a stored line list on purpose: a trip is a claim
+ * about where stock came from, so the answer has to come from the stock. An
+ * item eaten or thrown out since simply stops appearing, which is honest —
+ * the trip records what was bought, the kitchen records what is left.
+ */
+export function useTripItems(tripId: number | undefined): ItemView[] | undefined {
+  return useLiveQuery(async () => {
+    if (tripId == null) return []
+    const [items, reservations] = await Promise.all([
+      db.items.where('tripId').equals(tripId).toArray(),
+      db.reservations.toArray(),
+    ])
+    return buildViews(items, reservations)
+  }, [tripId])
 }
 
 export function useEvents(): LedgerEvent[] | undefined {

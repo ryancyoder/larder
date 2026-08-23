@@ -84,7 +84,10 @@ export interface TripStats {
   count: number
   avgIntervalDays: number | null
   daysSinceLast: number | null
+  /** Averaged over trips that carry a total — see the note in `tripStats`. */
   avgBasket: number
+  /** How many trips that average is built from, which is not always `count`. */
+  pricedCount: number
   /** Gap in days before each trip, oldest first — the trend line. */
   intervals: Array<{ date: string; days: number }>
   recent: Trip[]
@@ -99,13 +102,20 @@ export function tripStats(trips: Trip[]): TripStats {
   const avgInterval = intervals.length
     ? intervals.reduce((s, i) => s + i.days, 0) / intervals.length
     : null
-  const spend = sorted.reduce((s, t) => s + t.total, 0)
+  // Only trips that know what they cost. A scanned shop records what came home
+  // but never sees a price, so averaging it in as a $0 basket would report the
+  // household spending less rather than admitting the trip wasn't priced.
+  // Frequency is a different question — an unpriced shop is still a shop, so
+  // `count` and the intervals keep it.
+  const priced = sorted.filter((t) => t.total > 0)
+  const spend = priced.reduce((s, t) => s + t.total, 0)
 
   return {
     count: sorted.length,
     avgIntervalDays: avgInterval == null ? null : Math.round(avgInterval * 10) / 10,
     daysSinceLast: sorted.length ? daysBetween(sorted[sorted.length - 1].date, todayISO()) : null,
-    avgBasket: sorted.length ? round(spend / sorted.length) : 0,
+    avgBasket: priced.length ? round(spend / priced.length) : 0,
+    pricedCount: priced.length,
     intervals,
     recent: [...sorted].reverse().slice(0, 8),
   }

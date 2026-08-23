@@ -52,13 +52,72 @@ being in `package.json`. It was migrated to Postgres.
 2. **Photos live in Supabase Storage**, not IndexedDB — uploaded as `<household>/<uuid>-full.webp`
    and `-thumb.webp` (see `src/lib/photos.ts`).
 
-### ⚠️ Suspected stale import
+### The product catalogue — `products`
 
-`src/components/ItemSheet.tsx` still imports `useLiveQuery` from **`dexie-react-hooks`**,
-while everything else uses the app's own `src/app/live.ts`. Dexie's version depends on
-Dexie's observability, which no longer exists here, so that sheet may not refresh on
-changes. **I noticed this while writing these notes and did not test or fix it** — worth
-verifying before trusting live updates in the item sheet.
+**`Item` is a purchase. `Product` is the identity behind every such purchase.**
+Added in `0005_products.sql` to solve two problems with one table.
+
+The visible one is the ALDI receipt: its lines carry a six-digit item number rather than a
+UPC, so nothing on one resolves against Open Food Facts. That number is stable — the same
+tub of hummus is `343825` every week — so the barcode only has to be scanned off the packet
+**once**. `learnBarcode()` writes it onto the *product*, and every later receipt carrying
+that code arrives already named. An import therefore gets quieter over time: the first ALDI
+shop asks about everything, the tenth asks about whatever was new that week.
+
+The older, quieter problem is that `addItem` creates a new row per purchase, so buying
+carrots monthly left twelve rows called "Carrots", eleven at zero, with nothing recording
+that they were the same thing. **Stock is still one row per purchase** — two cartons bought
+a fortnight apart expire on different days, and collapsing them would lose that — but the
+identity now lives somewhere.
+
+Worth knowing, because it is a common misreading: **an item at zero has never been deleted
+or archived.** Nothing sets `archived` automatically; only an explicit delete removes stock.
+The complaint that motivated this table was really about duplicates, not disappearance.
+
+- `products` is keyed loosely on `(store, sku)` *and* `barcode`, both unique per household
+  and both partial — most rows have one identifier or the other, and the gap between them is
+  exactly what the scan closes.
+- `items.product_id` and `inbox_items.product_id` link back, both `on delete set null`.
+- `inbox_items` also carries `sku`, `store` and `price`, because a parked receipt line has to
+  remember enough of itself to become stock after the scan.
+- `lib/products.ts` holds the logic: `productByCode`, `upsertProduct` (fills gaps, never
+  overwrites — a name from a person or from Open Food Facts beats a till abbreviation, and
+  re-importing an old receipt must not undo either), `learnBarcode`, `recordPurchase`.
+- **Settings → Everything you buy** browses it, with a *Needs a scan* filter that is the
+  working list of products still wearing a till abbreviation.
+
+Barcode detection is now strict about length — 8, 12, 13 or 14 digits, the lengths that
+actually exist. Anything else is a till code. Sam's Club prints nine-digit item numbers that
+used to sail through as barcodes and would have fetched a confident answer about a
+completely different product.
+
+### Shopping trips
+
+`trips` and `items.trip_id` shipped in `0001_init.sql` but only ever half-worked: the
+shopping-list checkout was the one thing that wrote them and nothing read them back, so
+the live database had **zero trips** against 24 items. Migrations `0003` and `0004`
+finished the model:
+
+- `items.trip_id` has a real foreign key at last (`on delete set null` — losing a receipt
+  must not take the food off the shelf), plus an index for "what did this trip buy?".
+- `trips.source` is `'checkout' | 'receipt' | 'scan'`, because the three routes carry
+  different confidence.
+- `trips.printed_total` sits beside `trips.total`. They disagree when a line was skipped or
+  mis-read, and that gap is the only evidence an import was imperfect — recomputing `total`
+  would erase it.
+- `inbox_items.trip_id` carries the trip through the inbox, so a scan named three days
+  later still lands on the shop it came from.
+
+All three entry routes now record a trip. `TripSheet` (opened from *Recent trips* on
+Insights) is the first screen that ever showed one.
+
+### The stale Dexie import is gone
+
+`src/components/ItemSheet.tsx` was the last file importing `useLiveQuery` from
+`dexie-react-hooks`, which could not observe anything once Dexie stopped being the
+database. It now uses `src/app/live.ts` like everything else. Nothing in `src/` imports
+`dexie` or `dexie-react-hooks` any more, though both are still in `package.json` — safe to
+drop whenever someone wants to touch the lockfile.
 
 ---
 
@@ -102,6 +161,7 @@ Newest first:
 
 | Commit | What |
 |---|---|
+| `Import a receipt…` | Third rapid-entry route, and the trip model finished behind it. See below. |
 | `Kitchen: one toolbar…` | Four stacked filter bars → one row: search, a Filters button reporting its active count, and Group / Sort selects. Filters moved into a sheet. |
 | `Kitchen: drop "Eat me first"…` | Removed the scrolling urgency strip; the item list became a real table. |
 | `Fix the camera going black…` | See §5 — the most instructive bug here. |
@@ -123,6 +183,87 @@ Newest first:
   regression. *Food A–Z* sorts on the matched basic food (`foodMeta(item.foodKey)`), so all
   the onions gather regardless of brand, with ties falling back to item name.
 - Group and sort persist to `localStorage` under `larder-kitchen-view`.
+
+### Receipt import — `src/lib/receipt.ts` + `src/screens/ReceiptImport.tsx`
+
+Unpack → **🧾 Import a receipt**. Paste the text of a receipt, or photograph it.
+
+- **Why it exists:** it is the only entry route that knows what things *cost*. The ledger
+  has had a `value` column since the first release and almost nothing to put in it, so
+  Insights' spend figures were built on the shopping-list checkout alone — which the live
+  database says has never once been used.
+- **Everything above `commitReceipt` is pure.** Text in, lines out, no network and no
+  database. That is the whole debugging story for a parser that has to cope with input
+  nobody controls.
+- **Two stages, deliberately.** Parse, then review, then commit. A parser guessing at
+  somebody's layout will be wrong eventually, and a wrong *price* that lands silently is
+  worse than one you were shown first. Nothing touches the kitchen until the second screen.
+- **A line whose product has never been scanned parks in Unpack** for its one-time barcode
+  scan, rather than going on the shelf under a till abbreviation. A line whose product the
+  catalogue already knows goes straight to the kitchen wearing the real name. Which branch
+  a line takes is the catalogue's answer, not the receipt's.
+- **Open Food Facts runs in the background** and overrides the name in place when it has a
+  better one. It never overrides price or quantity: only the receipt knows those.
+- **Discounts are kept, not dropped.** A negative line never becomes stock, but leaving it
+  out would make every receipt with a coupon look mis-read.
+- The **printed total is stored beside the computed one**, and the screen reports the gap
+  rather than flagging it. Tax and summary savings lines explain almost all of it.
+
+#### ALDI is the reference case
+
+**Almost every receipt this household imports comes from ALDI**, and its layout is the one
+the parser is tuned against. A real one is transcribed into `receipt.test.ts`. It broke
+five assumptions at once, and between them they dropped every item on it:
+
+- **The tax code after the price is two letters** (`NC`, `FA`), where Walmart prints one
+  (`F`). Nothing matched a price, so all eight items were discarded in silence. The code is
+  now matched as part of the price pattern rather than stripped by an alphabet of guesses.
+- **The total is letter-spaced** — `T O T A L   $ 30.92` — which hid it from the word
+  `total` and imported it as a $30.92 item. `collapseSpacedLetters` is used when deciding
+  what a line *is*, never on a description.
+- **`AMOUNT DUE` and `8 ITEMS`** are furniture that carries a price.
+- **`C-Taxable @7.000%`** is not matched by `\btax\b`.
+- **The till prints mixed case**, so the title-caser demoted "CA Heritage Brut" to "Ca".
+  `expandDescription` now only re-cases a description that is shouting in capitals.
+
+**ALDI's item codes are six digits — its own numbering, not UPCs.** Nothing on an ALDI
+receipt will ever resolve against Open Food Facts, so the till's description *is* the name.
+That makes the shorthand table load-bearing here in a way it is not for a Walmart shopper,
+and it is the first place to look when an import comes out unreadable. The codes are kept
+in `rawDescription` and shown under each name on the review screen, so a bad expansion can
+be checked against the paper.
+
+Repeat lines fold: a till prints one line per scan, so two identical salamis are one row of
+two rather than two rows on the shelf. Matched on the till's own text and the unit price,
+never the expanded name.
+
+#### The tests
+
+`npm run test:receipt` — 50 assertions over six layouts (ALDI, Walmart, Kroger, Costco,
+Sam's Club, Target) plus the photo route. **These were kept**, unlike the throwaway
+`rapid.ts` tests. When a receipt reads wrong, paste it in as a new case, watch it fail, fix
+the parser, and check the others still pass. No test framework: the parser is pure, so a
+file of assertions and an exit code is the whole requirement.
+
+Things that cost a debugging cycle and are now pinned by a test:
+
+- **Order matters.** Strip the price from the end first, then the barcode, then read the
+  description. The other way round lets a price's digits look like a product code.
+- **The `@` clause must be read against the line including its price.** On a bare
+  `3 @ 0.39` the unit price *is* the price at the end, so searching only what survives the
+  strip leaves `3 @` and the quantity vanishes.
+- **A continuation line attaches by source row, not by "the last line we kept".** Without
+  that, an amount line following a dropped row rewrites some earlier item — which is how
+  2.14 lb of bananas became 2.14 gallons of milk.
+- **Tax flags sit on both sides of the price** on Walmart-style layouts, and only the one
+  after the barcode is reachable once the digits are gone.
+- Noise matching allows leading decoration (`**** TOTAL`) but a line still survives as a
+  product when it has a price and a real barcode — `TOTAL CEREAL` is a thing you can buy.
+- Six-digit store codes are **not** barcodes. Sending one to Open Food Facts returns a
+  confident answer about the wrong product, so only 8–14 digit runs are accepted.
+
+The shorthand table (`GV` → Great Value, `SHRD` → Shredded) is deliberately conservative
+and meant to be added to as real receipts turn up words it does not know.
 
 ### Barcode scanning
 
@@ -222,14 +363,25 @@ trigger *and* revisit the join screen.
 
 ## 7. Known gaps and things I couldn't verify
 
-- **`ItemSheet.tsx`'s Dexie import** (§2) — suspected stale, untested.
+- **Only ALDI has been checked against real paper.** The other five layouts were written
+  from memory and may be wrong in detail. Expect the first genuine receipt from any of them
+  to need a new case in `src/lib/receipt.test.ts`.
+- **The shorthand table has only the ALDI words seen on one receipt.** It will need adding
+  to as more come through — that is the expected maintenance, not a defect.
+- **The photo route is untested end to end** — it needs an Anthropic API key, and the
+  `settings` table currently has no rows at all, so nobody has ever set one.
+- **`commitReceipt` is not atomic.** It cannot be (§2): the trip is written first, then the
+  items one at a time, so a failure part-way leaves a trip with fewer items than it claims.
+  Written in that order on purpose — items with a short trip read as an incomplete import,
+  where items with no trip read as nothing at all.
 - **Camera behaviour is untested by me.** Continuous scanning, the 1.8s cooldown, the beep,
   and vibration all need a real phone and real packets. On iOS, Safari may require a user
   gesture before audio plays; opening the sheet is a tap, which *should* satisfy it, but if
   the beep is silent the audio unlock needs moving to the button press.
 - **Kitchen header buttons overflow** off the right edge on a narrow phone
   (Unpack / Tiles / Select / Settings). Pre-existing; noticed, not fixed.
-- No test suite. The `rapid.ts` tests were throwaway.
+- No test suite beyond `npm run test:receipt`. The `rapid.ts` tests were throwaway; the
+  receipt ones were not.
 
 ---
 

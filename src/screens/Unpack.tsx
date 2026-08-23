@@ -7,6 +7,7 @@ import { applyBarcode, confirmInbox, discardInbox, importPhotos, rescan, rescanA
 import { scanningAvailable } from '../lib/barcode'
 import BarcodeScanner from '../components/BarcodeScanner'
 import RapidScan from './RapidScan'
+import ReceiptImport from './ReceiptImport'
 import { loadPhotoBlob } from '../lib/photos'
 import { identifyPhoto, AIError } from '../lib/ai'
 import { getSetting } from '../db/db'
@@ -23,6 +24,7 @@ import { useToast } from '../app/toast'
  */
 export default function Unpack({ onClose }: { onClose: () => void }) {
   const [rapid, setRapid] = useState(false)
+  const [receipt, setReceipt] = useState(false)
   const rows = useInbox()
   const places = usePlaces() ?? []
   const cats = useCategories() ?? []
@@ -142,6 +144,9 @@ export default function Unpack({ onClose }: { onClose: () => void }) {
             ⚡ Scan a shop
           </button>
         )}
+        <button className="btn" disabled={!!progress} onClick={() => setReceipt(true)}>
+          🧾 Import a receipt
+        </button>
         {unnamed.length > 0 && (
           <button className="btn" disabled={!!scanBusy || !!aiBusy} onClick={scanAgain}>
             {scanBusy ? `Scanning ${scanBusy.done}/${scanBusy.total}…` : `🔎 Scan the ${unnamed.length} unknown`}
@@ -170,7 +175,8 @@ export default function Unpack({ onClose }: { onClose: () => void }) {
         {pending.length === 0 ? (
           <p className="pos-empty">
             Pick a batch of photos — one per item — and they land here. Anything with a readable
-            barcode names itself; the rest waits for you.
+            barcode names itself; the rest waits for you. A whole shop is quicker scanned, and
+            quicker still off the receipt, which knows the prices too.
           </p>
         ) : (
           pending.map((row) => (
@@ -202,6 +208,7 @@ export default function Unpack({ onClose }: { onClose: () => void }) {
       </footer>
 
       {rapid && <RapidScan onClose={() => setRapid(false)} />}
+      {receipt && <ReceiptImport onClose={() => setReceipt(false)} />}
     </div>
   )
 
@@ -268,7 +275,8 @@ function UnpackTile({
           <span className="pos-label">
             <span className="pos-name">{row.name || 'Not named yet'}</span>
             <span className="pos-meta">
-              {row.guessSource === 'barcode' ? 'from barcode'
+              {row.sku && !row.barcode ? `${row.store || 'receipt'} #${row.sku} · scan once`
+                : row.guessSource === 'barcode' ? 'from barcode'
                 : row.guessSource === 'ai' ? 'from the photo'
                 : row.guessNote ?? 'tap to name'}
             </span>
@@ -291,6 +299,15 @@ function UnpackTile({
               <p style={{ fontSize: 12, color: 'var(--text-mute)' }}>{row.guessNote}</p>
             )}
 
+            {row.sku && !row.barcode && (
+              <p style={{ fontSize: 12, color: 'var(--text-mute)', margin: 0 }}>
+                {row.store || 'The shop'} calls this <strong>#{row.sku}</strong>, which means
+                nothing to Open Food Facts. Scan the packet once and the two are linked for
+                good — every future receipt with that number arrives already named.
+                {row.price != null ? ` The receipt charged $${row.price.toFixed(2)}.` : ''}
+              </p>
+            )}
+
             <label className="field">
               <span>Name</span>
               <input
@@ -310,18 +327,20 @@ function UnpackTile({
             )}
 
             <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-              <button
-                className="btn ghost sm"
-                disabled={busy}
-                onClick={async () => {
-                  setBusy(true)
-                  const ok = await rescan(row)
-                  setBusy(false)
-                  onToast(ok ? 'Barcode found' : 'Still no barcode in that photo')
-                }}
-              >
-                🔎 Re-read this photo
-              </button>
+              {row.photoId != null && (
+                <button
+                  className="btn ghost sm"
+                  disabled={busy}
+                  onClick={async () => {
+                    setBusy(true)
+                    const ok = await rescan(row)
+                    setBusy(false)
+                    onToast(ok ? 'Barcode found' : 'Still no barcode in that photo')
+                  }}
+                >
+                  🔎 Re-read this photo
+                </button>
+              )}
               <span className="spacer" />
               <button
                 className="btn danger sm"

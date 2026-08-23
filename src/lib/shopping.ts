@@ -217,6 +217,7 @@ export async function checkout(items: ShopItem[], input: CheckoutInput): Promise
     store: input.store || 'Groceries',
     total: Math.round(total * 100) / 100,
     itemCount: bought.length,
+    source: 'checkout',
   })
 
   for (const line of bought) {
