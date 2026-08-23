@@ -300,6 +300,36 @@ Newest first:
   the onions gather regardless of brand, with ties falling back to item name.
 - Group and sort persist to `localStorage` under `larder-kitchen-view`.
 
+### Bare tiles — the frame comes off
+
+A second toggle beside Big/Small, persisted under `larder-tile-style`, switching
+`.pos-grid` between framed and `bare`. The two are independent: bare tiles come in
+both sizes.
+
+Bare is not a new presentation so much as the cutout one generalised. A cutout PNG
+already has its own edges, so the card around it is a box drawn around something
+already shaped; take it away and the products stand on the background. Three things
+had to change beyond deleting the border:
+
+- **Flow, not stacking.** A framed tile puts the caption *on* the picture and relies
+  on a scrim to stay readable. With no scrim a tall jar runs straight through its own
+  name, so bare tiles put image and caption in normal flow — `flex: 1` on the image,
+  auto on the label. That survives a two-line name; a fixed strip of reserved padding
+  does not, which is what the first attempt used and why it overlapped.
+- **A baseline.** `object-position: center bottom`, so a short jar sits on the same
+  floor as a tall carton and its caption is directly beneath it rather than stranded.
+  Also `.pos-grid.bare .pos-tile.has-cutout .pos-fill { padding: 0 4px }` — the
+  framed cutout reserves a foot strip for the stacked caption, and that rule
+  out-specifies the bare one, so without the override cutouts floated while ordinary
+  pack shots sat down.
+- **`aspect-ratio: 4 / 5`.** A square minus its caption is a letterbox, and a bottle
+  fitted to a letterbox is fitted to its height — it shrinks and strands space either
+  side. Portrait, but only slightly: every bit of height is a row you stop seeing.
+
+Selection has no border left to tint, so `.on` gets a rounded accent wash — a shape
+back, but only while it is on. On a cutout it shows through the transparent margin
+rather than covering the product.
+
 ### Tiles carry badges only at the large size
 
 `KitchenTiles` hangs four overlay toggles beside each tile — the B/L/D meal letters
