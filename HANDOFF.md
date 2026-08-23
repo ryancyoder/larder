@@ -300,6 +300,22 @@ Newest first:
   the onions gather regardless of brand, with ties falling back to item name.
 - Group and sort persist to `localStorage` under `larder-kitchen-view`.
 
+### Tiles carry badges only at the large size
+
+`KitchenTiles` hangs four overlay toggles beside each tile — the B/L/D meal letters
+(`.pos-meals`), main dish (`.pos-main`), set aside (`.pos-hold`) and staple (`.pos-star`).
+At the regular tile size they crowd out the two things a tile is for: what the thing is,
+and how much of it is left. They are hidden below the large size by one rule in
+`global.css` keyed on `.pos-grid:not(.large)`, which is where `TileBrowser` already writes
+tile size — no prop threading, and nothing in the component to keep in sync.
+
+`display: none`, not `visibility` or opacity: a control too small to hit is not a control,
+and leaving it in the accessibility tree would promise one. Every toggle is still on the
+item sheet, one tap away, and they all come back at Large.
+
+The expiry/low badge (`.pos-flag`) deliberately stays at both sizes. It is information
+rather than a control, and it is the reason to look at a wall of tiles at all.
+
 ### Receipt import — `src/lib/receipt.ts` + `src/screens/ReceiptImport.tsx`
 
 Unpack → **🧾 Import a receipt**. Paste the text of a receipt, or photograph it.

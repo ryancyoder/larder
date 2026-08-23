@@ -1265,6 +1265,20 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
    Tile size. Regular is the default; Large trades columns for reach.
    -------------------------------------------------------------------------- */
 
+/* A small tile shows what a thing is and how much is left, and nothing else.
+   Four overlay toggles — meal, main, hold, staple — on a tile that size are
+   more clutter than control, and every one of them is also on the item sheet a
+   tap away. They come back at the large size, where there is room to hit them.
+
+   `display: none` rather than hiding visually: a control too small to press is
+   not a control, and leaving it in the accessibility tree would promise one. */
+.pos-grid:not(.large) .pos-meals,
+.pos-grid:not(.large) .pos-main,
+.pos-grid:not(.large) .pos-hold,
+.pos-grid:not(.large) .pos-star {
+  display: none;
+}
+
 .pos-grid.large {
   grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
   gap: 12px;
