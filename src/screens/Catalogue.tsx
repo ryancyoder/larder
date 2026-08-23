@@ -44,7 +44,7 @@ type View = 'all' | 'unscanned' | 'scanned'
  * Each key carries the direction it should open in, because "sensible first" is
  * not one answer for every column: names read A–Z, prices read dearest first.
  */
-type SortKey = 'photo' | 'name' | 'brand' | 'food' | 'category' | 'sku' | 'barcode' | 'off' | 'size' | 'price'
+type SortKey = 'photo' | 'name' | 'brand' | 'food' | 'category' | 'store' | 'sku' | 'barcode' | 'off' | 'size' | 'price'
 type Dir = 'asc' | 'desc'
 
 const OPENS_DESC: SortKey[] = ['price', 'size', 'photo']
@@ -69,6 +69,7 @@ function value(p: Product, key: SortKey, paid: Map<number, LastPaid>): string | 
     case 'brand': return p.brand?.toLowerCase() ?? LAST
     case 'food': return foodMeta(p.foodKey)?.name.toLowerCase() ?? LAST
     case 'category': return p.category
+    case 'store': return p.store?.toLowerCase() ?? LAST
     case 'sku': return p.sku ?? LAST
     case 'barcode': return p.barcode ?? LAST
     case 'off': return offRank(p)
@@ -249,7 +250,7 @@ export default function Catalogue({ onBack }: { onBack?: () => void }) {
 
             <p className="cat-legend">
               <span className="cat-legend-lead">
-                <strong>Open Food Facts</strong> is the free product database barcodes are
+                <strong>FF</strong> — Open Food Facts, the free product database barcodes are
                 looked up in.
               </span>
               {/* Each flag stays glued to its meaning — wrapping between them
@@ -280,18 +281,20 @@ export default function Catalogue({ onBack }: { onBack?: () => void }) {
                     <SortTh sort={sort} onSort={toggle} col="brand" className="c-brand" label="Brand" />
                     <SortTh sort={sort} onSort={toggle} col="food" className="c-food" label="Food" />
                     <SortTh sort={sort} onSort={toggle} col="category" className="k-cat" label="Category" />
+                    <SortTh sort={sort} onSort={toggle} col="store" className="c-store" label="Store" />
                     <SortTh sort={sort} onSort={toggle} col="sku" className="c-sku" label="SKU" />
                     <SortTh sort={sort} onSort={toggle} col="barcode" className="c-barcode" label="Barcode" />
                     {/* Written out wherever there is room. "OFF" saves space and
                         costs comprehension — it reads as off/on, which is the
                         first thing anyone asked about this table. */}
+                    {/* "FF" — the legend under the toolbar spells it out, and
+                        the column is read down rather than word by word. */}
                     <SortTh
                       sort={sort}
                       onSort={toggle}
                       col="off"
                       className="c-off"
-                      label="Open Food Facts"
-                      short="OFF"
+                      label="FF"
                       title="Is this product listed in Open Food Facts?"
                     />
                     {/* Pack size, not stock: what one of them contains. How many
@@ -374,14 +377,13 @@ function PhotoSheet({ product, onClose }: { product: Product; onClose: () => voi
  * reader reads to say which column the table is ordered by.
  */
 function SortTh({
-  sort, onSort, col, className, label, short, title,
+  sort, onSort, col, className, label, title,
 }: {
   sort: SortState
   onSort: (key: SortKey) => void
   col: SortKey
   className: string
   label: string
-  short?: string
   title?: string
 }) {
   const active = sort.key === col
@@ -392,9 +394,7 @@ function SortTh({
       title={title}
     >
       <button type="button" className="th-sort" onClick={() => onSort(col)}>
-        {short
-          ? <><span className="c-off-full">{label}</span><span className="c-off-abbr">{short}</span></>
-          : label}
+        {label}
         <span className="th-arrow" aria-hidden>{active ? (sort.dir === 'asc' ? '▲' : '▼') : ''}</span>
       </button>
     </th>
@@ -440,10 +440,12 @@ function Row({
         <span>{meta.label}</span>
       </td>
 
+      <td className="c-store">
+        {product.store ?? <span className="muted">—</span>}
+      </td>
+
       <td className="c-sku tabular">
-        {product.sku
-          ? <><span>{product.sku}</span>{product.store && <small>{product.store}</small>}</>
-          : <span className="muted">—</span>}
+        {product.sku ?? <span className="muted">—</span>}
       </td>
 
       <td className="c-barcode tabular">
