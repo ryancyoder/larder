@@ -348,6 +348,23 @@ out first — the effect that starts the scanner depends only on stable callback
 wasn't re-running. Both faults produce an identical black screen, and fixing the wrong one
 looks like the fix failing.
 
+### …and then the second cause happened
+
+`TripScan` shipped with `useCallback(…, [beep, rows])`, where `rows` is `useInbox()`. The
+live-query subscription is deliberately coarse — **any** write re-runs **every** query — so
+each scan's own `applyBarcode` handed back a fresh array, which recreated the callback, which
+re-ran the effect that owns the camera, whose cleanup stops the stream. Black viewport after
+the first scan, indistinguishable from the `key` bug above. The comment above the ref in that
+file already said the callback had to stay stable; the dependency array said otherwise.
+
+`BarcodeScanner` had the same exposure by a different route: it depended on an `onDetected`
+prop that `UnpackTile` redefines on every render, so the single-shot scanner restarted
+whenever the inbox changed underneath it.
+
+**All three camera surfaces now hold their callback in a ref and depend on nothing**
+(`}, [])`). A correct dependency array is a promise someone has to keep; depending on nothing
+is the only version that cannot regress. If you add a fourth camera surface, do the same.
+
 ---
 
 ## 6. ⚠️ The shared Supabase project
@@ -402,6 +419,8 @@ trigger *and* revisit the join screen.
   items one at a time, so a failure part-way leaves a trip with fewer items than it claims.
   Written in that order on purpose — items with a short trip read as an incomplete import,
   where items with no trip read as nothing at all.
+- **Nothing here can drive a real camera**, so every camera regression so far has been found
+  by a user rather than by a check. Both black-viewport bugs reached production.
 - **Camera behaviour is untested by me.** Continuous scanning, the 1.8s cooldown, the beep,
   and vibration all need a real phone and real packets. On iOS, Safari may require a user
   gesture before audio plays; opening the sheet is a tap, which *should* satisfy it, but if
