@@ -34,6 +34,92 @@ function describe(name: string, run: () => void): void {
 
 // ---------------------------------------------------------------------------
 
+/**
+ * A real ALDI receipt, transcribed from the paper — and the reference case,
+ * because almost every receipt this household imports comes from there.
+ *
+ * It broke five assumptions at once when it first went through, and between
+ * them they dropped every single item on it:
+ *
+ *   - the tax code after the price is two letters ("NC", "FA"), not one, so no
+ *     line matched a price at all and all eight were silently discarded
+ *   - the total is letter-spaced, "T O T A L", which hid it from the word
+ *     `total` and turned it into a $30.92 item
+ *   - "AMOUNT DUE" and "8 ITEMS" are furniture with prices on them
+ *   - "C-Taxable @7.000%" is not matched by \btax\b
+ *   - the till prints mixed case, so the title-caser demoted "CA" to "Ca"
+ *
+ * Its item codes are six digits — ALDI's own numbering, not UPCs. Nothing on
+ * an ALDI receipt will ever resolve against Open Food Facts, which makes the
+ * description the entire name and this fixture the one that matters most.
+ */
+describe('ALDI — the real thing', () => {
+  const r = parseReceipt(`ALDI
+Store #37
+2906 LaPorte Avenue
+Valparaiso, IN
+https://help.aldi.us
+Your cashier today was Stephanie
+
+  514025 CA Heritage Brut          4.89 NC
+  638449 Maguires Stout            7.69 NC
+  356525 Carrots                   1.99 FA
+  343825 Assorted Hummus           2.59 FA
+  654779 Cocktail Salami           2.99 FA
+  654779 Cocktail Salami           2.99 FA
+  679181 Avocado Oil Chips         2.99 FA
+  383466 SemiSwt Mini Mrsls        3.65 NC
+Mastercard                        30.92
+***************0242 ONLINE
+08/15/26 18:05 Ref/Seq # 422779
+Trace # 422779
+Auth # 56302P
+AID A00000000041010
+TVR 0000001000
+IAD 0110606001622000DE9F000000003092
+OOFF
+TSI E800    ARC 00    EntryMode 05
+        ++APPROVED++
+
+SUBTOTAL                          29.78
+C-Taxable @7.000%                  1.14
+A-Taxable @0.00%                   0.00
+AMOUNT DUE                        30.92
+T O T A L        $ 30.92
+8 ITEMS
+Credit Card                     $ 30.92
+
+*6425 F594/005/005 08/15/26 06:05PM`)
+
+  check('store', r.store, 'ALDI')
+  check('date', r.date, '2026-08-15')
+  check('the letter-spaced total is found', r.printedTotal, 30.92)
+  // Eight items on the paper, seven rows: the two salamis fold into one.
+  check('row count', r.lines.length, 7)
+  check('names', r.lines.map((l) => l.description), [
+    'CA Heritage Brut',
+    'Maguires Stout',
+    'Carrots',
+    'Assorted Hummus',
+    'Cocktail Salami',
+    'Avocado Oil Chips',
+    'Semi-Sweet Mini Morsels',
+  ])
+  check('a repeat becomes a quantity', r.lines[4].qty, 2)
+  check('and its prices add up', r.lines[4].price, 5.98)
+  // The till's own text is kept beside the name, item code and all, so a
+  // mis-expansion can be checked against the paper on the review screen.
+  check('raw text kept', r.lines[4].rawDescription, '654779 Cocktail Salami')
+  // Six digits is ALDI's item number. Claiming it as a barcode would send it
+  // to Open Food Facts and get a confident answer about a different product.
+  check('no barcodes claimed', r.lines.every((l) => l.barcode === undefined), true)
+  check('mixed case is left alone', r.lines[0].description, 'CA Heritage Brut')
+  // Matches the SUBTOTAL printed on the receipt; the gap to TOTAL is the
+  // C-Taxable line, which is exactly what the review screen reports.
+  check('computed total', computedTotal(r.lines), 29.78)
+  check('everything is tax', Math.round((r.printedTotal! - computedTotal(r.lines)) * 100) / 100, 1.14)
+})
+
 describe('Walmart — description, UPC, tax flags either side of the price', () => {
   const r = parseReceipt(`
 Walmart

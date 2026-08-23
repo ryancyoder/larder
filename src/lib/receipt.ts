@@ -81,7 +81,11 @@ const NOISE = [
   // `\W*` because a receipt decorates its own total: "**** TOTAL", "== TOTAL".
   /^\W*sub\s*-?\s*total\b/i,
   /^\W*total\b/i,
-  /\b(tax|tx)\b/i,
+  // `taxable` too: ALDI itemises "C-Taxable @7.000%", and \btax\b alone will
+  // not match it.
+  /\btax(?:able|es)?\b|\btx\b/i,
+  /^\W*amount\s+due\b/i,
+  /^\W*\d+\s+items?\b/i,
   // A rate line: "T = TX 7.0000% on 3.49". The percent sign is the giveaway,
   // and no grocery description carries one except "2% MILK", which has no
   // decimal rate beside it.
@@ -107,12 +111,43 @@ const NOISE = [
   /^\(?\d{3}\)?[-\s]?\d{3}-\d{4}$/, // a phone number
 ]
 
-const CHAINS = [
-  'walmart', 'target', 'kroger', 'costco', "sam's club", 'sams club', 'aldi',
-  'publix', 'safeway', 'trader joe', 'whole foods', 'meijer', 'h-e-b', 'heb',
-  'wegmans', 'giant', 'food lion', 'winn-dixie', 'sprouts', 'hy-vee', 'hyvee',
-  'albertsons', 'vons', 'ralphs', 'harris teeter', 'stop & shop', 'shoprite',
-  "bj's", 'bjs', 'lidl', 'fresh market', 'natural grocers', 'ingles', 'wawa',
+/**
+ * Needle to match, and the name to show. Written out rather than derived,
+ * because no capitalisation rule gets ALDI, BJ's and Hy-Vee all right.
+ * Longer needles first, so "sam's club" is not shadowed by a shorter match.
+ */
+const CHAINS: Array<[string, string]> = [
+  ['aldi', 'ALDI'],
+  ['walmart', 'Walmart'],
+  ['target', 'Target'],
+  ['kroger', 'Kroger'],
+  ['costco', 'Costco'],
+  ["sam's club", "Sam's Club"],
+  ['sams club', "Sam's Club"],
+  ['publix', 'Publix'],
+  ['safeway', 'Safeway'],
+  ['trader joe', "Trader Joe's"],
+  ['whole foods', 'Whole Foods'],
+  ['meijer', 'Meijer'],
+  ['h-e-b', 'H-E-B'],
+  ['wegmans', 'Wegmans'],
+  ['food lion', 'Food Lion'],
+  ['winn-dixie', 'Winn-Dixie'],
+  ['sprouts', 'Sprouts'],
+  ['hy-vee', 'Hy-Vee'],
+  ['hyvee', 'Hy-Vee'],
+  ['albertsons', 'Albertsons'],
+  ['harris teeter', 'Harris Teeter'],
+  ['stop & shop', 'Stop & Shop'],
+  ['shoprite', 'ShopRite'],
+  ["bj's", "BJ's"],
+  ['lidl', 'Lidl'],
+  ['fresh market', 'The Fresh Market'],
+  ['natural grocers', 'Natural Grocers'],
+  ['ingles', 'Ingles'],
+  ['giant', 'Giant'],
+  ['vons', 'Vons'],
+  ['ralphs', 'Ralphs'],
 ]
 
 // ---------------------------------------------------------------------------
@@ -153,6 +188,10 @@ const SHORTHAND: Record<string, string> = {
   // Bare unit words, left behind when there is no number for readSize to take:
   // "MM WHL MLK GAL" is a gallon of milk, not a milk gal.
   GAL: 'Gallon', QT: 'Quart', LTR: 'Litre',
+  // Seen on real ALDI receipts, which abbreviate mid-word rather than by
+  // dropping vowels the way the American chains do.
+  SEMISWT: 'Semi-Sweet', MRSLS: 'Morsels', ASSRT: 'Assorted', ASSTD: 'Assorted',
+  ORGNC: 'Organic', SHREDS: 'Shredded', RSTD: 'Roasted', SNDWCH: 'Sandwich',
 }
 
 /** Size suffixes as a till writes them: "8Z", "64FLOZ", "2LB", "12CT". */
@@ -175,8 +214,17 @@ const SIZE_UNITS: Array<[RegExp, Unit]> = [
 // Parsing one line
 // ---------------------------------------------------------------------------
 
-/** A money token at the end of a line: "2.48", "$2.48", "-1.50", "1.50-". */
-const PRICE_AT_END = /(-)?\$?(\d{1,5}\.\d{2})\s*(-)?$/
+/**
+ * The money at the end of a line: "2.48", "$ 30.92", "-1.50", "1.50-", "4.89 NC".
+ *
+ * The trailing letters are a tax code, and they are matched here rather than
+ * stripped beforehand because their length varies by chain — Walmart prints one
+ * (`F`), ALDI prints two (`NC`, `FA`) — and guessing the alphabet wrongly means
+ * no line on the receipt has a price at all, so every item is silently dropped.
+ * After a decimal amount the position is unambiguous, so anything short and
+ * alphabetic there is a code.
+ */
+const PRICE_AT_END = /(-)?\$?\s*(\d{1,5}\.\d{2})\s*(-)?(?:\s+[A-Za-z]{1,3})?\s*$/
 
 /**
  * Tax flags — F for food, N/O for non-taxable, T/X for taxed. They trail the
@@ -198,8 +246,21 @@ function stripFlags(text: string): string {
 /** "2 @ 1.99", "2 AT $1.99", "1.23 lb @ 2.99" — a quantity and a unit price. */
 const AT_PRICE = /(\d+(?:\.\d+)?)\s*(?:([a-z]{1,4})\s*)?(?:@|\bat\b)\s*\$?(\d+(?:\.\d+)?)/i
 
+/**
+ * "T O T A L" back into "TOTAL".
+ *
+ * ALDI letter-spaces its total line for emphasis, which hides it from every
+ * pattern that looks for the word — and a hidden total becomes a $30.92 item
+ * called "T O T A L". Applied only when deciding what a line *is*, never to a
+ * description, where spaced capitals could be somebody's brand.
+ */
+function collapseSpacedLetters(text: string): string {
+  return text.replace(/\b(?:[A-Za-z]\s+){2,}[A-Za-z]\b/g, (run) => run.replace(/\s+/g, ''))
+}
+
 function isNoise(line: string): boolean {
-  return NOISE.some((p) => p.test(line))
+  const flat = collapseSpacedLetters(line)
+  return NOISE.some((p) => p.test(line) || p.test(flat))
 }
 
 /**
@@ -241,8 +302,16 @@ function readSize(text: string): { size?: number; sizeUnit?: Unit; rest: string 
   return { rest: text }
 }
 
-/** Till shorthand out, ordinary words in. Anything unknown is title-cased. */
+/**
+ * Till shorthand out, ordinary words in.
+ *
+ * A receipt that already prints mixed case has done the casing work itself, so
+ * only the shorthand is substituted — re-casing ALDI's "CA Heritage Brut" would
+ * demote the state to "Ca". A receipt shouting in capitals gets title-cased,
+ * because "GV SHRD MOZZ" is nobody's idea of a shelf label.
+ */
 export function expandDescription(raw: string): string {
+  const shouting = raw === raw.toUpperCase()
   const words = raw
     .replace(/[^A-Za-z0-9'&.\s-]/g, ' ')
     .split(/\s+/)
@@ -253,6 +322,7 @@ export function expandDescription(raw: string): string {
       if (known) return known
       // A bare number left in the middle of a name is a code fragment, not a word.
       if (/^\d+$/.test(bare)) return ''
+      if (!shouting) return bare
       return bare.toLowerCase().replace(/^[a-z]/, (c) => c.toUpperCase())
     })
     .filter(Boolean)
@@ -393,14 +463,8 @@ function findStore(lines: string[]): string | undefined {
   const head = lines.slice(0, 8)
   for (const line of head) {
     const lower = line.toLowerCase()
-    const chain = CHAINS.find((c) => lower.includes(c))
-    if (chain) {
-      // Not \b: a word boundary sits after an apostrophe too, which is how
-      // "sam's club" comes back as "Sam'S Club".
-      return chain
-        .replace(/(^|[\s-])([a-z])/g, (_, lead: string, c: string) => lead + c.toUpperCase())
-        .replace(/^Bjs$/, "BJ's")
-    }
+    const chain = CHAINS.find(([needle]) => lower.includes(needle))
+    if (chain) return chain[1]
   }
   // No chain we know. The first line that reads like a name rather than an
   // address, a phone number or a rule of dashes.
@@ -418,8 +482,9 @@ function findStore(lines: string[]): string | undefined {
 function findPrintedTotal(lines: string[]): number | undefined {
   let found: number | undefined
   for (const line of lines) {
-    if (!/\btotal\b/i.test(line)) continue
-    if (/sub\s*-?\s*total/i.test(line)) continue
+    const flat = collapseSpacedLetters(line)
+    if (!/\btotal\b/i.test(flat)) continue
+    if (/sub\s*-?\s*total/i.test(flat)) continue
     const match = stripFlags(line).match(PRICE_AT_END)
     if (match) found = Number(match[2])
   }
@@ -508,10 +573,46 @@ export function parseReceipt(text: string): ParsedReceipt {
   return {
     store: findStore(rows),
     date: findDate(text),
-    lines,
+    lines: foldRepeats(lines),
     printedTotal: findPrintedTotal(rows),
     ignored,
   }
+}
+
+/**
+ * Two rows of the same thing at the same price become one row of two.
+ *
+ * A till prints a line per scan, so buying two identical salamis prints two
+ * identical lines — and importing them literally puts two rows called "Cocktail
+ * Salami" on the shelf, which is not how anyone thinks about their own
+ * cupboard. Same behaviour as the rapid scanner, and just as reversible: the
+ * quantity is a stepper on the review screen.
+ *
+ * Matched on the till's own text and the unit price, never on the expanded
+ * name — two different products can expand to the same words, and folding
+ * those together would quietly lose one.
+ */
+function foldRepeats(lines: ReceiptLine[]): ReceiptLine[] {
+  const out: ReceiptLine[] = []
+  const each = (l: ReceiptLine) => Math.round(((l.price ?? 0) / (l.qty || 1)) * 100) / 100
+
+  for (const line of lines) {
+    const twin = line.kind === 'item'
+      ? out.find((f) =>
+          f.kind === 'item' &&
+          f.rawDescription === line.rawDescription &&
+          f.unit === line.unit &&
+          each(f) === each(line))
+      : undefined
+
+    if (twin) {
+      twin.qty += line.qty
+      twin.price = Math.round(((twin.price ?? 0) + (line.price ?? 0)) * 100) / 100
+      continue
+    }
+    out.push({ ...line })
+  }
+  return out
 }
 
 /** What the lines add up to, discounts included. */

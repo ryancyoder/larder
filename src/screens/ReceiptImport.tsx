@@ -161,7 +161,9 @@ export default function ReceiptImport({ onClose }: { onClose: () => void }) {
       >
         <p style={{ fontSize: 12.5, color: 'var(--text-mute)', margin: 0 }}>
           Paste the text of a receipt — from the shop's emailed copy or its app. Every line
-          with a price on it becomes an item, and the barcodes fill in real product names.
+          with a price on it becomes an item, named by the receipt. Where a line carries a
+          full barcode, Open Food Facts fills in a better name behind you; ALDI's six-digit
+          item numbers are its own, so those keep the till's wording.
         </p>
 
         <label className="field">
@@ -170,7 +172,7 @@ export default function ReceiptImport({ onClose }: { onClose: () => void }) {
             value={text}
             rows={10}
             autoFocus
-            placeholder={'GV SHRD MOZZ 8Z   007874201234 F   2.48 N\nBANANAS           000000004011 F   1.19 F'}
+            placeholder={'  514025 CA Heritage Brut     4.89 NC\n  356525 Carrots              1.99 FA'}
             onChange={(e) => setText(e.target.value)}
             style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12, lineHeight: 1.5 }}
           />

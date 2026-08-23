@@ -169,13 +169,41 @@ Unpack → **🧾 Import a receipt**. Paste the text of a receipt, or photograph
 - The **printed total is stored beside the computed one**, and the screen reports the gap
   rather than flagging it. Tax and summary savings lines explain almost all of it.
 
-#### The parser, and its tests
+#### ALDI is the reference case
 
-`npm run test:receipt` — 38 assertions over five real chain layouts (Walmart, Kroger,
-Costco, Sam's Club, Target) plus the photo route. **These were kept**, unlike the throwaway
+**Almost every receipt this household imports comes from ALDI**, and its layout is the one
+the parser is tuned against. A real one is transcribed into `receipt.test.ts`. It broke
+five assumptions at once, and between them they dropped every item on it:
+
+- **The tax code after the price is two letters** (`NC`, `FA`), where Walmart prints one
+  (`F`). Nothing matched a price, so all eight items were discarded in silence. The code is
+  now matched as part of the price pattern rather than stripped by an alphabet of guesses.
+- **The total is letter-spaced** — `T O T A L   $ 30.92` — which hid it from the word
+  `total` and imported it as a $30.92 item. `collapseSpacedLetters` is used when deciding
+  what a line *is*, never on a description.
+- **`AMOUNT DUE` and `8 ITEMS`** are furniture that carries a price.
+- **`C-Taxable @7.000%`** is not matched by `\btax\b`.
+- **The till prints mixed case**, so the title-caser demoted "CA Heritage Brut" to "Ca".
+  `expandDescription` now only re-cases a description that is shouting in capitals.
+
+**ALDI's item codes are six digits — its own numbering, not UPCs.** Nothing on an ALDI
+receipt will ever resolve against Open Food Facts, so the till's description *is* the name.
+That makes the shorthand table load-bearing here in a way it is not for a Walmart shopper,
+and it is the first place to look when an import comes out unreadable. The codes are kept
+in `rawDescription` and shown under each name on the review screen, so a bad expansion can
+be checked against the paper.
+
+Repeat lines fold: a till prints one line per scan, so two identical salamis are one row of
+two rather than two rows on the shelf. Matched on the till's own text and the unit price,
+never the expanded name.
+
+#### The tests
+
+`npm run test:receipt` — 50 assertions over six layouts (ALDI, Walmart, Kroger, Costco,
+Sam's Club, Target) plus the photo route. **These were kept**, unlike the throwaway
 `rapid.ts` tests. When a receipt reads wrong, paste it in as a new case, watch it fail, fix
-the parser, and check the other five still pass. No test framework: the parser is pure, so
-a file of assertions and an exit code is the whole requirement.
+the parser, and check the others still pass. No test framework: the parser is pure, so a
+file of assertions and an exit code is the whole requirement.
 
 Things that cost a debugging cycle and are now pinned by a test:
 
@@ -295,9 +323,11 @@ trigger *and* revisit the join screen.
 
 ## 7. Known gaps and things I couldn't verify
 
-- **The receipt parser has only been run against layouts I wrote by hand.** Five chains,
-  no real paper. Expect the first genuine receipt to need a new case in
-  `src/lib/receipt.test.ts`.
+- **Only ALDI has been checked against real paper.** The other five layouts were written
+  from memory and may be wrong in detail. Expect the first genuine receipt from any of them
+  to need a new case in `src/lib/receipt.test.ts`.
+- **The shorthand table has only the ALDI words seen on one receipt.** It will need adding
+  to as more come through — that is the expected maintenance, not a defect.
 - **The photo route is untested end to end** — it needs an Anthropic API key, and the
   `settings` table currently has no rows at all, so nobody has ever set one.
 - **`commitReceipt` is not atomic.** It cannot be (§2): the trip is written first, then the
