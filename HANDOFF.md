@@ -52,6 +52,45 @@ being in `package.json`. It was migrated to Postgres.
 2. **Photos live in Supabase Storage**, not IndexedDB — uploaded as `<household>/<uuid>-full.webp`
    and `-thumb.webp` (see `src/lib/photos.ts`).
 
+### The product catalogue — `products`
+
+**`Item` is a purchase. `Product` is the identity behind every such purchase.**
+Added in `0005_products.sql` to solve two problems with one table.
+
+The visible one is the ALDI receipt: its lines carry a six-digit item number rather than a
+UPC, so nothing on one resolves against Open Food Facts. That number is stable — the same
+tub of hummus is `343825` every week — so the barcode only has to be scanned off the packet
+**once**. `learnBarcode()` writes it onto the *product*, and every later receipt carrying
+that code arrives already named. An import therefore gets quieter over time: the first ALDI
+shop asks about everything, the tenth asks about whatever was new that week.
+
+The older, quieter problem is that `addItem` creates a new row per purchase, so buying
+carrots monthly left twelve rows called "Carrots", eleven at zero, with nothing recording
+that they were the same thing. **Stock is still one row per purchase** — two cartons bought
+a fortnight apart expire on different days, and collapsing them would lose that — but the
+identity now lives somewhere.
+
+Worth knowing, because it is a common misreading: **an item at zero has never been deleted
+or archived.** Nothing sets `archived` automatically; only an explicit delete removes stock.
+The complaint that motivated this table was really about duplicates, not disappearance.
+
+- `products` is keyed loosely on `(store, sku)` *and* `barcode`, both unique per household
+  and both partial — most rows have one identifier or the other, and the gap between them is
+  exactly what the scan closes.
+- `items.product_id` and `inbox_items.product_id` link back, both `on delete set null`.
+- `inbox_items` also carries `sku`, `store` and `price`, because a parked receipt line has to
+  remember enough of itself to become stock after the scan.
+- `lib/products.ts` holds the logic: `productByCode`, `upsertProduct` (fills gaps, never
+  overwrites — a name from a person or from Open Food Facts beats a till abbreviation, and
+  re-importing an old receipt must not undo either), `learnBarcode`, `recordPurchase`.
+- **Settings → Everything you buy** browses it, with a *Needs a scan* filter that is the
+  working list of products still wearing a till abbreviation.
+
+Barcode detection is now strict about length — 8, 12, 13 or 14 digits, the lengths that
+actually exist. Anything else is a till code. Sam's Club prints nine-digit item numbers that
+used to sail through as barcodes and would have fetched a confident answer about a
+completely different product.
+
 ### Shopping trips
 
 `trips` and `items.trip_id` shipped in `0001_init.sql` but only ever half-worked: the
@@ -159,9 +198,10 @@ Unpack → **🧾 Import a receipt**. Paste the text of a receipt, or photograph
 - **Two stages, deliberately.** Parse, then review, then commit. A parser guessing at
   somebody's layout will be wrong eventually, and a wrong *price* that lands silently is
   worse than one you were shown first. Nothing touches the kitchen until the second screen.
-- **Unknown barcodes still go to the kitchen**, named by the receipt's own description —
-  unlike the rapid scanner, which parks them in the inbox. The receipt always supplies a
-  name and a price, so there is nothing left to ask.
+- **A line whose product has never been scanned parks in Unpack** for its one-time barcode
+  scan, rather than going on the shelf under a till abbreviation. A line whose product the
+  catalogue already knows goes straight to the kitchen wearing the real name. Which branch
+  a line takes is the catalogue's answer, not the receipt's.
 - **Open Food Facts runs in the background** and overrides the name in place when it has a
   better one. It never overrides price or quantity: only the receipt knows those.
 - **Discounts are kept, not dropped.** A negative line never becomes stock, but leaving it

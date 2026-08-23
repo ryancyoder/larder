@@ -11,6 +11,7 @@ import { moveCategory } from '../lib/categories'
 import { movePerson } from '../lib/people'
 import { useCategories, usePeople, usePlaces } from '../app/data'
 import { useAuth } from '../app/auth'
+import Catalogue from './Catalogue'
 import PlaceEditor from '../components/PlaceEditor'
 import CategoryEditor from '../components/CategoryEditor'
 import PersonEditor from '../components/PersonEditor'
@@ -26,6 +27,7 @@ export default function Settings({ onClose }: { onClose: () => void }) {
     () => (document.documentElement.dataset.theme as Theme) || 'dark',
   )
   const [key, setKey] = useState('')
+  const [catalogueOpen, setCatalogueOpen] = useState(false)
   const [hasKey, setHasKey] = useState(false)
   const [photoBytes, setPhotoBytes] = useState<number | null>(null)
   const [cutoutCached, setCutoutCached] = useState(false)
@@ -77,7 +79,22 @@ export default function Settings({ onClose }: { onClose: () => void }) {
   }
 
   return (
+    <>
     <Sheet title="Settings" onClose={onClose}>
+      <div className="card card-pad stack">
+        <div>
+          <div style={{ fontWeight: 650 }}>Everything you buy</div>
+          <p style={{ fontSize: 12.5, color: 'var(--text-mute)', marginTop: 4 }}>
+            The catalogue: one entry per product, however many times you buy it. Separate from
+            the kitchen, which is what's on the shelf right now — running out of something
+            doesn't make you stop being a household that buys it.
+          </p>
+        </div>
+        <button className="btn" onClick={() => setCatalogueOpen(true)}>
+          📇 Open the catalogue
+        </button>
+      </div>
+
       <Field label="Appearance">
         <Seg
           value={theme}
@@ -406,5 +423,8 @@ export default function Settings({ onClose }: { onClose: () => void }) {
         />
       )}
     </Sheet>
+
+    {catalogueOpen && <Catalogue onClose={() => setCatalogueOpen(false)} />}
+    </>
   )
 }

@@ -5,7 +5,7 @@ import { sortPlaces } from '../lib/locations'
 import { setCategoryRegistry, sortCategories } from '../lib/categories'
 import { sortPeople } from '../lib/people'
 import type {
-  Combo, InboxItem, ItemView, LedgerEvent, MealDay, Person, PlanEntry, Recipe, ShopItem, StorageCategory, StoragePlace, Trip,
+  Combo, InboxItem, ItemView, LedgerEvent, MealDay, Person, PlanEntry, Product, Recipe, ShopItem, StorageCategory, StoragePlace, Trip,
 } from '../db/schema'
 
 /** Live views over IndexedDB. Every screen reads through these, never the tables directly. */
@@ -61,6 +61,14 @@ export function useInbox(): InboxItem[] | undefined {
 
 export function useShopList(): ShopItem[] | undefined {
   return useLiveQuery(() => db.shop.toArray(), [])
+}
+
+/**
+ * The product catalogue — identity rather than stock, so it does not shrink
+ * when the food is eaten.
+ */
+export function useProducts(): Product[] | undefined {
+  return useLiveQuery(() => db.products.toArray(), [])
 }
 
 export function useTrips(): Trip[] | undefined {

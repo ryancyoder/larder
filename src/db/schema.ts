@@ -159,6 +159,59 @@ export interface InboxItem {
    * lands on the right trip. Absent for a photo imported on its own.
    */
   tripId?: number
+  /**
+   * Set when the row is a receipt line waiting for its one-time barcode scan.
+   * The catalogue entry already exists — scanning fills in its barcode, which
+   * is what stops the next receipt asking again.
+   */
+  productId?: number
+  sku?: string
+  store?: string
+  /** What the receipt charged, carried through so the ledger stays complete. */
+  price?: number
+  createdAt: string
+}
+
+/**
+ * A product the household buys — the catalogue entry, not the thing on the shelf.
+ *
+ * `Item` is one purchase: this carton, bought on Tuesday, going off on Friday.
+ * `Product` is the identity behind every such purchase — "Friendly Farms Whole
+ * Milk", once, no matter how many cartons pass through. Stock stays per-purchase
+ * because two cartons bought a fortnight apart expire on different days; what was
+ * missing was any record that they were the same thing.
+ *
+ * It is also where a till's item number becomes useful. An ALDI receipt carries
+ * a six-digit SKU rather than a barcode, so nothing on it resolves against Open
+ * Food Facts. The SKU is stable, though, so scanning the real barcode off the
+ * packet **once** teaches this row, and every later receipt carrying that SKU
+ * resolves without asking again.
+ */
+export interface Product {
+  id?: number
+  name: string
+  brand?: string
+  /**
+   * The real product barcode, once someone has scanned one. Absent is the
+   * meaningful state: it marks a product still waiting for its one-time scan.
+   */
+  barcode?: string
+  /**
+   * The till's own item number and the chain it belongs to. Neither means
+   * anything without the other — ALDI's 514025 is not Target's 514025.
+   */
+  store?: string
+  sku?: string
+  category: Category
+  foodKey?: string
+  unit: Unit
+  size?: number
+  sizeUnit?: Unit
+  nutrition?: Nutrition
+  photoId?: number
+  timesBought: number
+  lastBoughtAt?: string
+  lastPrice?: number
   createdAt: string
 }
 
@@ -226,6 +279,11 @@ export interface Item {
   brand?: string
   notes?: string
   tripId?: number
+  /**
+   * The catalogue entry this is an instance of. Optional because stock predates
+   * the catalogue, and because a one-off from the market is not worth one.
+   */
+  productId?: number
   /**
    * Hidden from the kitchen. Nothing sets this automatically any more — running
    * out leaves an item on the shelf at zero. Kept on the model so older exports

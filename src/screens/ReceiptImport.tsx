@@ -135,7 +135,11 @@ export default function ReceiptImport({ onClose }: { onClose: () => void }) {
         setBusy(false)
         return
       }
-      toast(`${result.added} item${result.added === 1 ? '' : 's'} in from ${store || 'the shop'}`)
+      toast(
+        result.parked
+          ? `${result.added} put away · ${result.parked} need a one-time scan in Unpack`
+          : `${result.added} item${result.added === 1 ? '' : 's'} in from ${store || 'the shop'}`,
+      )
       onClose()
     } catch (err) {
       setBusy(false)

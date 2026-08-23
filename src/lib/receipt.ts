@@ -1,9 +1,9 @@
 import { db } from '../db/db'
-import type { Category, Nutrition, Trip, Unit } from '../db/schema'
-import { guessCategory } from './categories'
+import type { Category, InboxItem, Nutrition, Trip, Unit } from '../db/schema'
 import { addItem } from './inventory'
 import { suggestExpiry, suggestPlace } from './locations'
 import { todayISO } from './dates'
+import { recordPurchase, upsertProduct } from './products'
 
 /**
  * Reading a till receipt.
@@ -38,6 +38,12 @@ export interface ReceiptLine {
   raw: string
   kind: LineKind
   barcode?: string
+  /**
+   * The shop's own item number, where the line printed one. Not a barcode and
+   * never sent to Open Food Facts — it is the key the product catalogue uses to
+   * recognise this line next time.
+   */
+  sku?: string
   /** Expanded and title-cased — what goes on the shelf if nothing better turns up. */
   description: string
   /** Untouched till text, kept because the expansion is a guess and can be wrong. */
@@ -264,25 +270,46 @@ function isNoise(line: string): boolean {
 }
 
 /**
- * Pulls a barcode out of what is left after the price is removed.
+ * The lengths a real barcode actually comes in: EAN-8/UPC-E is 8, UPC-A is 12,
+ * EAN-13 is 13, ITF-14 is 14.
  *
- * UPC-E is 8, UPC-A is 12, EAN-13 is 13 and ITF-14 is 14; store-assigned PLUs
- * are shorter and are left alone, because a 4-digit run is far more likely to
- * be part of a description than a product code. The longest run wins, and the
- * last of equal length, since the code usually trails the description.
+ * Matched exactly rather than as "8 or more", because a store's own item number
+ * is frequently 9 or 10 digits and looks like a barcode until it is sent to
+ * Open Food Facts, which answers confidently about an entirely different
+ * product. A number that is not one of these lengths is a till code.
  */
+const BARCODE_LENGTHS = new Set([8, 12, 13, 14])
+
+/** Pulls a barcode out of what is left after the price is removed. */
 function findBarcode(text: string): { barcode?: string; rest: string } {
-  const runs = [...text.matchAll(/\d{6,14}/g)]
+  const runs = [...text.matchAll(/\d{6,20}/g)].filter((r) => BARCODE_LENGTHS.has(r[0].length))
   if (!runs.length) return { rest: text }
 
+  // The last of the longest: the code usually trails the description.
   let best = runs[0]
   for (const run of runs) {
     if (run[0].length >= best[0].length) best = run
   }
-  if (best[0].length < 8) return { rest: text }
 
   const rest = text.slice(0, best.index) + ' ' + text.slice(best.index! + best[0].length)
   return { barcode: best[0], rest }
+}
+
+/**
+ * The till's own item number, which most chains print before the description.
+ *
+ * Taken only from the front of the line and only once the barcode is gone, so
+ * what is left can be read plainly: a long number at the start of a purchase
+ * line is a code, because no product is named after one.
+ *
+ * Worth keeping even though it means nothing to Open Food Facts. It is stable
+ * per product — that tub of hummus is 343825 every week — so the catalogue can
+ * hang a scanned barcode off it once and answer for every later receipt.
+ */
+function findStoreCode(text: string): { sku?: string; rest: string } {
+  const match = text.match(/^\s*(\d{4,13})(?=\s|$)/)
+  if (!match) return { rest: text }
+  return { sku: match[1], rest: text.slice(match[0].length) }
 }
 
 /**
@@ -409,7 +436,8 @@ function buildLine(parts: {
   unit?: Unit
   price: number
 }): ReceiptLine {
-  const { size, sizeUnit, rest } = readSize(parts.text)
+  const { sku, rest: unnumbered } = findStoreCode(parts.text)
+  const { size, sizeUnit, rest } = readSize(unnumbered)
   const rawDescription = rest.replace(/\s+/g, ' ').trim()
   const description = expandDescription(rawDescription)
   const kind: LineKind = parts.price < 0 ? 'discount' : 'item'
@@ -420,11 +448,16 @@ function buildLine(parts: {
     raw: parts.raw,
     kind,
     barcode,
+    sku,
     // Nothing but a price and a code. Kept — the lookup may still name it — but
     // it needs something on screen that is not a blank row.
     description:
       description ||
-      (kind === 'discount' ? 'Discount' : barcode ? `Item ${barcode.slice(-4)}` : 'Unnamed line'),
+      (kind === 'discount'
+        ? 'Discount'
+        : barcode || sku
+          ? `Item ${(barcode ?? sku)!.slice(-4)}`
+          : 'Unnamed line'),
     rawDescription: rawDescription || parts.raw,
     qty: parts.qty,
     unit: parts.unit ?? 'ea',
@@ -600,6 +633,7 @@ function foldRepeats(lines: ReceiptLine[]): ReceiptLine[] {
     const twin = line.kind === 'item'
       ? out.find((f) =>
           f.kind === 'item' &&
+          f.sku === line.sku &&
           f.rawDescription === line.rawDescription &&
           f.unit === line.unit &&
           each(f) === each(line))
@@ -641,6 +675,18 @@ export interface ScannedReceipt {
   lines: Array<{ barcode?: string; description: string; qty: number; price: number }>
 }
 
+/**
+ * A transcribed line puts its code in `barcode` because the model cannot tell
+ * a UPC from a till number by looking. Length decides: anything that is not a
+ * real barcode length is treated as the shop's own code and rejoined to the
+ * front of the description, where `findStoreCode` will pick it up.
+ */
+function codeIntoText(code: string | undefined, text: string): string {
+  const clean = code?.replace(/\D/g, '') ?? ''
+  if (!clean || BARCODE_LENGTHS.has(clean.length)) return text
+  return `${clean} ${text}`
+}
+
 /** Transcribed rows into the same reviewed shape a pasted receipt produces. */
 export function receiptFromScan(scan: ScannedReceipt): ParsedReceipt {
   const lines = scan.lines
@@ -649,8 +695,10 @@ export function receiptFromScan(scan: ScannedReceipt): ParsedReceipt {
       buildLine({
         raw: [l.barcode, l.description, l.price?.toFixed(2)].filter(Boolean).join('  '),
         index: i,
-        barcode: l.barcode,
-        text: stripFlags(l.description ?? ''),
+        barcode: BARCODE_LENGTHS.has((l.barcode ?? '').replace(/\D/g, '').length)
+          ? l.barcode
+          : undefined,
+        text: codeIntoText(l.barcode, stripFlags(l.description ?? '')),
         qty: Number.isFinite(l.qty) && l.qty > 0 ? l.qty : 1,
         price: Number.isFinite(l.price) ? l.price : 0,
       }),
@@ -731,19 +779,30 @@ export interface CommitReceiptInput {
 
 export interface ReceiptResult {
   tripId: number
+  /** Lines that went straight onto the shelf, already known. */
   added: number
+  /** Lines parked in Unpack because their product has never been scanned. */
+  parked: number
 }
 
 /**
  * Turns the reviewed lines into stock, all of it stamped with one trip.
  *
- * Every line goes to the kitchen, named by the receipt when Open Food Facts had
- * nothing better — a cryptic name on a shelf is still a thing you know you own,
- * and this is the one import route where the quantity and the price are already
- * certain, so there is nothing left to ask.
+ * Every line is looked up in the product catalogue first, by barcode where the
+ * receipt printed one and by till code otherwise. What happens next depends on
+ * whether this household has met the product before:
+ *
+ *   * **Known** — straight onto the shelf, wearing the catalogue's name rather
+ *     than the till's abbreviation, with its brand and nutrition attached.
+ *   * **New** — a catalogue entry is created and the line waits in Unpack for
+ *     its one-time barcode scan. Scanning it there teaches the catalogue, and
+ *     every later receipt carrying that code skips this branch entirely.
+ *
+ * So the first ALDI import asks about everything and the tenth asks about
+ * whatever was new that week, which is the point of the whole arrangement.
  *
  * Not a transaction. `db.transaction()` cannot be one against PostgREST, so a
- * failure part-way leaves the trip and the items written so far. The trip is
+ * failure part-way leaves the trip and the rows written so far. The trip is
  * created first on purpose: items with a trip that is missing its rows read as
  * an incomplete import, where rows with no trip read as nothing at all.
  */
@@ -770,23 +829,66 @@ export async function commitReceipt(
   const tripId = await db.trips.add(trip)
 
   let added = 0
+  let parked = 0
+
   for (const line of buying) {
     const found = line.barcode ? lookups[line.barcode] : undefined
-    const name = (found?.name ?? line.description).trim()
-    const category = found?.category ?? guessCategory(name)
+
+    // The catalogue entry, created here if this is the first sighting. Named
+    // from the lookup when there was one, and from the till otherwise.
+    const product = await upsertProduct({
+      name: (found?.name ?? line.description).trim(),
+      brand: found?.brand,
+      barcode: line.barcode,
+      store: input.store,
+      sku: line.sku,
+      category: found?.category,
+      unit: line.unit,
+      size: line.size ?? found?.size,
+      sizeUnit: line.sizeUnit ?? found?.sizeUnit,
+      nutrition: found?.nutrition,
+    })
+
+    // No barcode on the catalogue entry means nobody has ever scanned the
+    // packet, so nothing here knows what it really is beyond a till
+    // abbreviation. It waits in Unpack for that one scan rather than going on
+    // the shelf under a name nobody chose.
+    if (!product.barcode) {
+      const row: Omit<InboxItem, 'id'> = {
+        name: product.name,
+        brand: product.brand,
+        category: product.category,
+        qty: line.qty,
+        unit: line.unit,
+        scanned: false,
+        productId: product.id,
+        sku: line.sku,
+        store: input.store,
+        price: line.price,
+        tripId,
+        guessSource: 'manual',
+        guessNote: line.sku
+          ? `From the receipt — scan the packet once and every ${input.store || 'shop'} receipt will know it`
+          : 'From the receipt — scan the packet to identify it',
+        createdAt: new Date().toISOString(),
+      }
+      await db.inbox.add(row)
+      parked++
+      continue
+    }
+
+    const category = product.category
     const location = suggestPlace(places, category)
-    const size = line.size ?? found?.size
-    const sizeUnit = line.sizeUnit ?? found?.sizeUnit
 
     await addItem({
-      name,
+      name: product.name,
       category,
       location,
       qty: line.qty,
       qtyInitial: line.qty,
       unit: line.unit,
-      size,
-      sizeUnit,
+      size: line.size ?? product.size,
+      sizeUnit: line.sizeUnit ?? product.sizeUnit,
       // The receipt's figure is for the whole line, which is exactly what
       // `price` means — unitPrice() divides by qtyInitial when it needs to.
       price: line.price,
@@ -794,13 +896,18 @@ export async function commitReceipt(
       expiresAt: suggestExpiry(places, category, location),
       isStaple: false,
       archived: false,
-      barcode: line.barcode,
-      brand: found?.brand,
-      nutrition: found?.nutrition,
+      barcode: product.barcode,
+      brand: product.brand,
+      nutrition: product.nutrition,
+      foodKey: product.foodKey,
+      productId: product.id,
       tripId,
     })
+    if (product.id != null) {
+      await recordPurchase(product.id, { price: line.price, date: trip.date, qty: line.qty })
+    }
     added++
   }
 
-  return { tripId, added }
+  return { tripId, added, parked }
 }

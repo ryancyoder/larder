@@ -275,7 +275,8 @@ function UnpackTile({
           <span className="pos-label">
             <span className="pos-name">{row.name || 'Not named yet'}</span>
             <span className="pos-meta">
-              {row.guessSource === 'barcode' ? 'from barcode'
+              {row.sku && !row.barcode ? `${row.store || 'receipt'} #${row.sku} · scan once`
+                : row.guessSource === 'barcode' ? 'from barcode'
                 : row.guessSource === 'ai' ? 'from the photo'
                 : row.guessNote ?? 'tap to name'}
             </span>
@@ -298,6 +299,15 @@ function UnpackTile({
               <p style={{ fontSize: 12, color: 'var(--text-mute)' }}>{row.guessNote}</p>
             )}
 
+            {row.sku && !row.barcode && (
+              <p style={{ fontSize: 12, color: 'var(--text-mute)', margin: 0 }}>
+                {row.store || 'The shop'} calls this <strong>#{row.sku}</strong>, which means
+                nothing to Open Food Facts. Scan the packet once and the two are linked for
+                good — every future receipt with that number arrives already named.
+                {row.price != null ? ` The receipt charged $${row.price.toFixed(2)}.` : ''}
+              </p>
+            )}
+
             <label className="field">
               <span>Name</span>
               <input
@@ -317,18 +327,20 @@ function UnpackTile({
             )}
 
             <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-              <button
-                className="btn ghost sm"
-                disabled={busy}
-                onClick={async () => {
-                  setBusy(true)
-                  const ok = await rescan(row)
-                  setBusy(false)
-                  onToast(ok ? 'Barcode found' : 'Still no barcode in that photo')
-                }}
-              >
-                🔎 Re-read this photo
-              </button>
+              {row.photoId != null && (
+                <button
+                  className="btn ghost sm"
+                  disabled={busy}
+                  onClick={async () => {
+                    setBusy(true)
+                    const ok = await rescan(row)
+                    setBusy(false)
+                    onToast(ok ? 'Barcode found' : 'Still no barcode in that photo')
+                  }}
+                >
+                  🔎 Re-read this photo
+                </button>
+              )}
               <span className="spacer" />
               <button
                 className="btn danger sm"

@@ -70,7 +70,7 @@ export function getVersion(): number {
 const WATCHED = [
   'items', 'reservations', 'recipes', 'plan_entries', 'meal_days', 'combos',
   'shop_items', 'trips', 'ledger_events', 'settings', 'places', 'categories',
-  'people', 'photos', 'inbox_items',
+  'people', 'photos', 'inbox_items', 'products',
 ] as const
 
 /**
@@ -118,6 +118,12 @@ const MAPS: Record<string, FieldMap> = {
     photoId: 'photo_id', qtyInitial: 'qty_initial', sizeUnit: 'size_unit',
     purchasedAt: 'purchased_at', expiresAt: 'expires_at', openedAt: 'opened_at',
     isMain: 'is_main', isStaple: 'is_staple', parQty: 'par_qty', tripId: 'trip_id',
+    productId: 'product_id',
+  },
+  products: {
+    foodKey: 'food_key', sizeUnit: 'size_unit', photoId: 'photo_id',
+    timesBought: 'times_bought', lastBoughtAt: 'last_bought_at',
+    lastPrice: 'last_price', createdAt: 'created_at',
   },
   reservations: {
     itemId: 'item_id', planId: 'plan_id', personKey: 'person_key', createdAt: 'created_at',
@@ -144,7 +150,7 @@ const MAPS: Record<string, FieldMap> = {
   people: {},
   inbox_items: {
     photoId: 'photo_id', guessSource: 'guess_source', guessNote: 'guess_note',
-    createdAt: 'created_at', tripId: 'trip_id',
+    createdAt: 'created_at', tripId: 'trip_id', productId: 'product_id',
   },
   settings: {},
 }

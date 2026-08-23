@@ -107,12 +107,16 @@ Credit Card                     $ 30.92
   ])
   check('a repeat becomes a quantity', r.lines[4].qty, 2)
   check('and its prices add up', r.lines[4].price, 5.98)
-  // The till's own text is kept beside the name, item code and all, so a
-  // mis-expansion can be checked against the paper on the review screen.
-  check('raw text kept', r.lines[4].rawDescription, '654779 Cocktail Salami')
-  // Six digits is ALDI's item number. Claiming it as a barcode would send it
-  // to Open Food Facts and get a confident answer about a different product.
+  // The till's own wording is kept beside the name, so a mis-expansion can be
+  // checked against the paper on the review screen.
+  check('raw text kept', r.lines[4].rawDescription, 'Cocktail Salami')
+  // Six digits is ALDI's item number, and it is captured as one. Claiming it
+  // as a barcode would send it to Open Food Facts and get a confident answer
+  // about an entirely different product.
   check('no barcodes claimed', r.lines.every((l) => l.barcode === undefined), true)
+  check('item numbers captured', r.lines.map((l) => l.sku), [
+    '514025', '638449', '356525', '343825', '654779', '679181', '383466',
+  ])
   check('mixed case is left alone', r.lines[0].description, 'CA Heritage Brut')
   // Matches the SUBTOTAL printed on the receipt; the gap to TOTAL is the
   // C-Taxable line, which is exactly what the review screen reports.
@@ -153,6 +157,7 @@ VISA TEND                                15.93
   ])
   // The amount line below Bananas raises that line, and does not leak upward.
   check('quantities', r.lines.map((l) => l.qty), [1, 3, 1, 1, 1])
+  check('a real 12-digit UPC still reads as one', r.lines[0].barcode, '007874201234')
   check('pack size off the name', r.lines[0].size, 8)
   check('pack size unit', r.lines[0].sizeUnit, 'oz')
   // "TOTAL CEREAL" is a product; "TOTAL" and "SUBTOTAL" are not.
@@ -215,6 +220,9 @@ TOTAL                      8.26
 
   check('store', r.store, "Sam's Club")
   check('names', r.lines.map((l) => l.description), ['Great Value Whole Milk', 'Rotisserie Chicken'])
+  // Nine digits is no barcode length there is, so it is the club's own number.
+  check('nine digits is a till code', r.lines.map((l) => l.sku), ['980183526', '193847261'])
+  check('and not a barcode', r.lines.map((l) => l.barcode), [undefined, undefined])
 })
 
 describe('Target — short item codes are not barcodes', () => {
@@ -235,6 +243,7 @@ TOTAL                           4.92
   // Six digits is a store code, not a UPC — sending it to Open Food Facts
   // would return a confident answer about the wrong product.
   check('no barcode claimed', r.lines.map((l) => l.barcode), [undefined, undefined])
+  check('captured as till codes instead', r.lines.map((l) => l.sku), ['215708', '017781'])
 })
 
 describe('A photographed receipt lands in the same shape', () => {
