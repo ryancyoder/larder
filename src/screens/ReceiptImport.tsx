@@ -254,6 +254,7 @@ export default function ReceiptImport({ onClose }: { onClose: () => void }) {
         style={{ gap: 10, alignItems: 'baseline', fontSize: 12.5, color: 'var(--text-mute)' }}
       >
         <span>Lines add up to <strong style={{ color: 'var(--text-dim)' }}>{money(computed)}</strong></span>
+        <span style={{ fontSize: 11.5 }}>· prices shown are each</span>
         {printed != null && <span>· receipt says {money(printed)}</span>}
         {gap != null && gap !== 0 && (
           <span>
@@ -375,15 +376,27 @@ function LineRow({
         </div>
       )}
 
+      {/* The price of one, with the line total underneath only when they
+          differ. A summed total is a quantity in disguise — "$5.98" says
+          nothing you can weigh against next month's single jar. */}
       <span
         className="qty"
         style={{
-          flex: 'none', minWidth: 56, textAlign: 'right',
+          flex: 'none', minWidth: 66, textAlign: 'right',
           fontVariantNumeric: 'tabular-nums',
           color: discount ? 'var(--ok, var(--text-mute))' : undefined,
         }}
       >
-        {line.price != null ? money(line.price) : '—'}
+        {line.price == null ? '—' : discount || line.qty <= 1 ? (
+          money(line.price)
+        ) : (
+          <>
+            {money(line.price / line.qty)}
+            <small style={{ display: 'block', fontSize: 10.5, fontWeight: 500, color: 'var(--text-mute)' }}>
+              {line.qty} = {money(line.price)}
+            </small>
+          </>
+        )}
       </span>
     </div>
   )

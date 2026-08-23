@@ -118,11 +118,13 @@ function TripList({
                 </span>
               </span>
               {priced && item.price != null && (
-                <span style={{ fontSize: 13, fontVariantNumeric: 'tabular-nums', flex: 'none' }}>
-                  {money(item.price)}
+                <span style={{ fontSize: 13, fontVariantNumeric: 'tabular-nums', flex: 'none', textAlign: 'right' }}>
+                  {/* The price of one leads; the line total follows only when
+                      they differ. A summed total compares against nothing. */}
+                  {money(item.qtyInitial > 1 ? unitPrice(item) : item.price)}
                   {item.qtyInitial > 1 && (
-                    <span style={{ fontSize: 10.5, color: 'var(--text-mute)' }}>
-                      {' '}({money(unitPrice(item))} ea)
+                    <span style={{ display: 'block', fontSize: 10.5, color: 'var(--text-mute)' }}>
+                      {item.qtyInitial} = {money(item.price)}
                     </span>
                   )}
                 </span>
