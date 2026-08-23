@@ -186,6 +186,91 @@ export async function learnBarcode(
   return { product: { ...product, ...patch }, named: Boolean(found) }
 }
 
+// ---------------------------------------------------------------------------
+// Asking about everything at once
+// ---------------------------------------------------------------------------
+
+export interface SweepProgress {
+  done: number
+  total: number
+  found: number
+  missing: number
+  /** What is being looked up right now, so the button can say something true. */
+  current?: string
+}
+
+export interface SweepOptions {
+  /** Ask again about codes already answered 'missing'. The database grows. */
+  recheckMissing?: boolean
+  onProgress?: (p: SweepProgress) => void
+  signal?: { cancelled: boolean }
+}
+
+/**
+ * Asks Open Food Facts about every barcode the catalogue holds.
+ *
+ * Needed because the answer was not always recorded. `off_status` arrived after
+ * the scanning did, so a household that had already scanned forty products was
+ * left with forty barcodes and no idea which of them the database knew — the
+ * column read blank for every row, which looks like a broken feature rather
+ * than a missing fact.
+ *
+ * Gaps are filled and the status is written; **names are never overwritten**.
+ * A name in the catalogue came either from a scan that already consulted Open
+ * Food Facts or from a person typing it, and both beat re-deciding it now.
+ *
+ * Sequential with a pause between calls. Open Food Facts is a free community
+ * service and this is a background convenience, so it can afford to be polite.
+ */
+export async function sweepOpenFoodFacts(
+  products: Product[],
+  opts: SweepOptions = {},
+): Promise<SweepProgress> {
+  const targets = products.filter((p) => {
+    if (!p.barcode) return false
+    if (!p.offStatus) return true
+    return opts.recheckMissing ? p.offStatus === 'missing' : false
+  })
+
+  const state: SweepProgress = { done: 0, total: targets.length, found: 0, missing: 0 }
+  opts.onProgress?.({ ...state })
+
+  for (const product of targets) {
+    if (opts.signal?.cancelled) break
+    state.current = product.name
+
+    const found = await lookupBarcode(product.barcode!).catch(() => null)
+    const patch: Partial<Product> = { offStatus: found ? 'found' : 'missing' }
+
+    if (found) {
+      state.found++
+      // Gaps only. The name is deliberately not among them.
+      if (!product.brand && found.brand) patch.brand = found.brand
+      if (!product.nutrition && found.nutrition) patch.nutrition = found.nutrition
+      if (product.size == null && found.qty != null) {
+        patch.size = found.qty
+        patch.sizeUnit = found.unit
+      }
+      if (!product.foodKey) {
+        const food = matchFood(found.name, found.brand)
+        if (food) patch.foodKey = food
+      }
+    } else {
+      state.missing++
+    }
+
+    if (product.id != null) await db.products.update(product.id, patch)
+    state.done++
+    opts.onProgress?.({ ...state })
+
+    // A free community API, asked politely.
+    if (!opts.signal?.cancelled) await new Promise((r) => setTimeout(r, 120))
+  }
+
+  state.current = undefined
+  return state
+}
+
 /** Bookkeeping, so the catalogue can be sorted by what actually gets bought. */
 export async function recordPurchase(
   productId: number,

@@ -92,6 +92,14 @@ The complaint that motivated this table was really about duplicates, not disappe
   780px, and carries a visible legend rather than a tooltip. "OFF" alone reads as off/on and
   was the first thing anyone asked about the table; a tooltip does not answer it on a touch
   screen, where there is nothing to hover.
+- **Catalog → "Check N against Open Food Facts"** sweeps every barcode the catalogue holds
+  and records the answer. It exists because `off_status` arrived *after* the scanning did:
+  a household forty products deep had forty barcodes and no recorded answer for any of them,
+  so the column read blank for every row and looked broken rather than unanswered. The sweep
+  fills gaps and writes the status but **never overwrites a name** — a catalogue name came
+  either from a scan that already consulted Open Food Facts or from a person, and both beat
+  re-deciding it now. Sequential with a pause between calls, cancellable, and once everything
+  is answered the button becomes *"re-check the N it didn't know"*, since the database grows.
 - **`products.off_status`** (`0006`) records what Open Food Facts said, rather than the
   catalogue inferring it from whether `nutrition` came back — which is wrong both ways, since
   a listed product may declare nothing worth storing and nutrition can be typed by hand.
