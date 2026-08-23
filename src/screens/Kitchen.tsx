@@ -55,7 +55,7 @@ function writePref(field: string, value: string) {
 
 /** What a food-name sort compares on: the basic food, else the item's own name. */
 function foodName(item: ItemView): string {
-  return (foodMeta(item.foodKey)?.name ?? item.name).toLowerCase()
+  return (foodMeta(item.foodKey)?.name ?? item.displayName).toLowerCase()
 }
 
 export default function Kitchen({ onOpenSettings }: { onOpenSettings: () => void }) {
@@ -407,7 +407,7 @@ function ItemRow({ item, people, onClick, selecting, picked }: {
         </td>
       )}
       <td className="k-name">
-        <span className="nm">{item.name}</span>
+        <span className="nm">{item.displayName}</span>
         {item.reserved > 0 && (
           <span className="chip tone-hold">
             <span className="dot" />

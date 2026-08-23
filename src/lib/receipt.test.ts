@@ -1,5 +1,5 @@
 import { computedTotal, expandDescription, parseReceipt, receiptFromScan } from './receipt'
-import { comparePrice, lastPaidByProduct } from './products'
+import { comparePrice, friendlyName, lastPaidByProduct, productName } from './products'
 
 /**
  * Fixtures for the receipt parser. Run with `npm run test:receipt`.
@@ -355,6 +355,31 @@ describe('Last paid, derived from stock rather than cached', () => {
   check('a multi-buy is priced per unit', map.get(2)?.unitPrice, 2.59)
   check('an unpriced purchase says nothing', map.get(3), undefined)
   check('an unknown product says nothing', map.get(99), undefined)
+})
+
+describe('A short name out of a long label', () => {
+  // The brand has its own column; repeating it in the name is noise.
+  check('brand prefix goes', friendlyName('Great Value Shredded Mozzarella', 'Great Value'), 'Shredded Mozzarella')
+  check('but only as a prefix', friendlyName('Mozzarella by Great Value', 'Great Value'), 'Mozzarella by Great Value')
+  check('and case-insensitively', friendlyName('GREAT VALUE Milk', 'Great Value'), 'Milk')
+
+  // Open Food Facts puts the pack size in the name because the name is the label.
+  check('trailing sizes go', friendlyName('Coca-Cola Classic, 12 pk, 12 fl oz'), 'Coca-Cola Classic')
+  check('a bare trailing size too', friendlyName('Cheddar Block 8 oz'), 'Cheddar Block')
+  check('a trailing parenthetical', friendlyName('Hummus (10 oz tub)'), 'Hummus')
+
+  // Nothing is reworded, and nothing is cut to a stub.
+  check('an ordinary name is left alone', friendlyName('Fine Green Beans, Frozen'), 'Fine Green Beans, Frozen')
+  check('a comma that is not a size stays', friendlyName('Beans, Baked'), 'Beans, Baked')
+  check('half a name is worse than a long one', friendlyName('Oat 16 oz', 'Oat'), 'Oat 16 oz')
+  check('whitespace is tidied', friendlyName('  Rice   Cakes  '), 'Rice Cakes')
+})
+
+describe('Reading a product name', () => {
+  check('the short one wins', productName({ name: 'Long Label 8 oz', displayName: 'Cheddar' }), 'Cheddar')
+  check('falling back when absent', productName({ name: 'Long Label 8 oz' }), 'Long Label 8 oz')
+  // A blank override must not blank the product.
+  check('and when blank', productName({ name: 'Cheddar', displayName: '   ' }), 'Cheddar')
 })
 
 console.log(

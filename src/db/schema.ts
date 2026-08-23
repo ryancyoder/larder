@@ -200,7 +200,22 @@ export interface InboxItem {
  */
 export interface Product {
   id?: number
+  /**
+   * What the source called it. Open Food Facts writes the full label — brand,
+   * variant, pack size, all of it — and a till writes 22 characters of
+   * consonants. Both are kept: they are what the record said, and they are how
+   * the product is found again.
+   */
   name: string
+  /**
+   * The short one, for reading on a shelf. Derived from `name` and `brand`
+   * rather than typed, and overridable when the derivation gets it wrong.
+   *
+   * Absent means nobody has derived one yet, and every caller falls back to
+   * `name` — so an empty field is a missing convenience, never a missing
+   * product. `productName()` is the only correct way to read it.
+   */
+  displayName?: string
   brand?: string
   /**
    * The real product barcode, once someone has scanned one. Absent is the
@@ -514,6 +529,12 @@ export interface ItemView extends Item {
   reserved: number
   available: number
   holds: Reservation[]
+  /**
+   * The name to show for this item — the catalogue's friendly name where there
+   * is one, the item's own otherwise. `name` stays what this particular
+   * purchase was called; this is what display code should read.
+   */
+  displayName: string
   /**
    * The picture to show for this item.
    *

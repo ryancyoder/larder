@@ -105,7 +105,7 @@ function KitchenTile({ item, showMeals, onOpen, onHold }: { item: ItemView; show
     <button
       className={`pos-tile${photo ? ' has-photo' : ''}${cutout ? ' has-cutout' : ''}${item.qty <= 0 ? ' spent' : ''}${item.reserved > 0 ? ' reserved' : ''}`}
       onClick={onOpen}
-      aria-label={`Open ${item.name}`}
+      aria-label={`Open ${item.displayName}`}
     >
       {photo
         ? <img className={`pos-fill${cutout ? ' is-cutout' : ''}`} src={photo} alt="" loading="lazy" />
@@ -114,7 +114,7 @@ function KitchenTile({ item, showMeals, onOpen, onHold }: { item: ItemView; show
         : <Glyph emoji={meta.emoji} photoId={meta.photoId} size={34} className="pos-glyph" />}
 
       <span className="pos-label">
-        <span className="pos-name">{item.name}</span>
+        <span className="pos-name">{item.displayName}</span>
         <span className="pos-meta">
           {item.qty <= 0
             ? 'Out'

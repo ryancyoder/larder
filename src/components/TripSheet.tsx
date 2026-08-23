@@ -109,7 +109,7 @@ function TripList({
             <div className="row" key={item.id} style={{ gap: 8, alignItems: 'center', padding: '5px 0' }}>
               <CatDot category={item.category} />
               <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>{item.name}</span>
+                <span style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>{item.displayName}</span>
                 <span style={{ fontSize: 11, color: 'var(--text-mute)' }}>
                   {formatAmount(item.qtyInitial, item.unit)} bought
                   {item.qty > 0 && item.qty !== item.qtyInitial

@@ -62,7 +62,7 @@ function ShopTile({ item, qty, list }: { item: ItemView; qty: number; list: Para
 
         {/* On a photo tile this becomes a scrimmed caption pinned to the bottom. */}
         <span className="pos-label">
-          <span className="pos-name">{item.name}</span>
+          <span className="pos-name">{item.displayName}</span>
           <span className="pos-meta">
             {item.available <= 0 ? 'Out' : formatAmount(item.available, item.unit)}
           </span>

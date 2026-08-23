@@ -4,8 +4,8 @@ import { useAllStock, useProducts } from '../app/data'
 import { categoryMeta } from '../lib/categories'
 import { foodMeta } from '../lib/foods'
 import {
-  lastPaidByProduct, offLabel, searchProducts, sweepOpenFoodFacts,
-  type LastPaid, type SweepProgress,
+  friendlyName, lastPaidByProduct, offLabel, productName, searchProducts,
+  sweepOpenFoodFacts, type LastPaid, type SweepProgress,
 } from '../lib/products'
 import { CatDot, Empty, Glyph, Seg, Sheet } from '../components/ui'
 import PhotoCapture from '../components/PhotoCapture'
@@ -44,7 +44,7 @@ type View = 'all' | 'unscanned' | 'scanned'
  * Each key carries the direction it should open in, because "sensible first" is
  * not one answer for every column: names read A–Z, prices read dearest first.
  */
-type SortKey = 'photo' | 'name' | 'brand' | 'food' | 'category' | 'store' | 'sku' | 'barcode' | 'off' | 'size' | 'price'
+type SortKey = 'photo' | 'name' | 'catalogName' | 'brand' | 'food' | 'category' | 'store' | 'sku' | 'barcode' | 'off' | 'size' | 'price'
 type Dir = 'asc' | 'desc'
 
 const OPENS_DESC: SortKey[] = ['price', 'size', 'photo']
@@ -66,6 +66,7 @@ function offRank(p: Product): number {
 function value(p: Product, key: SortKey, paid: Map<number, LastPaid>): string | number {
   switch (key) {
     case 'photo': return p.photoId != null ? 1 : 0
+    case 'catalogName': return p.name.toLowerCase()
     case 'brand': return p.brand?.toLowerCase() ?? LAST
     case 'food': return foodMeta(p.foodKey)?.name.toLowerCase() ?? LAST
     case 'category': return p.category
@@ -75,7 +76,7 @@ function value(p: Product, key: SortKey, paid: Map<number, LastPaid>): string | 
     case 'off': return offRank(p)
     case 'size': return p.size ?? -1
     case 'price': return (p.id != null ? paid.get(p.id)?.unitPrice : undefined) ?? -1
-    default: return p.name.toLowerCase()
+    default: return productName(p).toLowerCase()
   }
 }
 
@@ -88,7 +89,7 @@ function compare(a: Product, b: Product, sort: SortState, paid: Map<number, Last
   if (sort.dir === 'desc') n = -n
   // Name breaks every tie, so the order is stable and reads alphabetically
   // within a group.
-  return n || a.name.localeCompare(b.name)
+  return n || productName(a).localeCompare(productName(b))
 }
 
 export default function Catalogue({ onBack }: { onBack?: () => void }) {
@@ -278,6 +279,7 @@ export default function Catalogue({ onBack }: { onBack?: () => void }) {
                     <SortTh sort={sort} onSort={toggle} col="name" className="k-name" label="Product" />
                     {/* The basic food, not the product: fresh, canned and frozen
                         beets are three products and one food. See lib/foods.ts. */}
+                    <SortTh sort={sort} onSort={toggle} col="catalogName" className="c-catname" label="Catalog name" />
                     <SortTh sort={sort} onSort={toggle} col="brand" className="c-brand" label="Brand" />
                     <SortTh sort={sort} onSort={toggle} col="food" className="c-food" label="Food" />
                     <SortTh sort={sort} onSort={toggle} col="category" className="k-cat" label="Category" />
@@ -327,7 +329,7 @@ export default function Catalogue({ onBack }: { onBack?: () => void }) {
         </>
       )}
 
-      {editing && <PhotoSheet product={editing} onClose={() => setEditing(null)} />}
+      {editing && <ProductSheet product={editing} onClose={() => setEditing(null)} />}
     </>
   )
 }
@@ -335,36 +337,80 @@ export default function Catalogue({ onBack }: { onBack?: () => void }) {
 const money = (n: number) => `$${n.toFixed(2)}`
 
 /**
- * Setting the master picture for a product.
+ * The two things about a product a person decides: what it is called, and what
+ * it looks like.
  *
- * Whatever is chosen here becomes the picture *everywhere* — the kitchen, the
- * tiles, the calendar — because every item resolves through its product. That
- * is the point: one good photograph of the packet beats a different blurry one
- * per carton.
+ * Both become the answer *everywhere* — the kitchen, the tiles, the calendar —
+ * because every item resolves through its product. Which is the point: one
+ * good name and one good photograph beat a different guess per carton.
  *
  * A replaced photo is left in storage rather than deleted. Items keep their own
  * `photoId` as a fallback and may still point at it, and an orphaned blob is a
  * far cheaper mistake than a picture that vanishes somewhere else in the app.
  */
-function PhotoSheet({ product, onClose }: { product: Product; onClose: () => void }) {
+function ProductSheet({ product, onClose }: { product: Product; onClose: () => void }) {
   const toast = useToast()
+  const [name, setName] = useState(productName(product))
 
-  async function set(photoId: number | undefined) {
+  async function setPhoto(photoId: number | undefined) {
     if (product.id == null) return
     await db.products.update(product.id, { photoId })
-    toast(photoId == null ? 'Picture removed' : `Picture set for ${product.name}`)
+    toast(photoId == null ? 'Picture removed' : `Picture set for ${productName(product)}`)
+  }
+
+  async function saveName() {
+    if (product.id == null) return
+    const next = name.trim()
+    // Matching the catalogue name means there is nothing to override, so the
+    // field is cleared rather than storing the same string twice.
+    await db.products.update(product.id, {
+      displayName: !next || next === product.name ? undefined : next,
+    })
+    toast('Name saved')
+    onClose()
   }
 
   return (
-    <Sheet title={product.name} onClose={onClose}>
-      <p style={{ fontSize: 12.5, color: 'var(--text-mute)', margin: 0 }}>
-        The catalogue's reference picture. Every one of these you own shows this photo — in
-        the kitchen, the tiles and the calendar — so it is worth taking once, well.
+    <Sheet
+      title={productName(product)}
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn ghost" onClick={onClose}>Cancel</button>
+          <button className="btn primary" onClick={saveName} disabled={!name.trim()}>Save</button>
+        </>
+      }
+    >
+      <label className="field">
+        <span>Display name</span>
+        <input type="text" value={name} autoFocus onChange={(e) => setName(e.target.value)} />
+      </label>
+      <p style={{ fontSize: 11.5, color: 'var(--text-mute)', margin: 0 }}>
+        What this is called everywhere in the app. The catalogue keeps
+        <strong style={{ color: 'var(--text-dim)' }}> {product.name}</strong> as the name the
+        receipt or Open Food Facts gave it — that is the record, and what the product is
+        found again by.
+        {friendlyName(product.name, product.brand) !== product.name && (
+          <>
+            {' '}
+            <button
+              className="btn ghost sm"
+              style={{ marginTop: 6 }}
+              onClick={() => setName(friendlyName(product.name, product.brand))}
+            >
+              Use the derived name
+            </button>
+          </>
+        )}
+      </p>
+
+      <PhotoCapture photoId={product.photoId} onChange={setPhoto} label="Reference picture" />
+      <p style={{ fontSize: 11.5, color: 'var(--text-mute)', margin: 0 }}>
+        Every one of these you own shows this photo, so it is worth taking once, well.
         {product.offStatus === 'found' && product.photoId != null
-          ? " The one there now came from Open Food Facts; yours replaces it."
+          ? ' The one there now came from Open Food Facts; yours replaces it.'
           : ''}
       </p>
-      <PhotoCapture photoId={product.photoId} onChange={set} label="Reference picture" />
     </Sheet>
   )
 }
@@ -422,7 +468,16 @@ function Row({
       </td>
 
       <td className="k-name">
-        <span className="nm">{product.name}</span>
+        <span className="nm">{productName(product)}</span>
+      </td>
+
+      {/* What the source called it: Open Food Facts' full label, or the till's
+          own wording. Kept beside the short name rather than replaced by it —
+          it is what the record said, and what the product is found again by. */}
+      <td className="c-catname">
+        {product.displayName?.trim() && product.displayName.trim() !== product.name
+          ? product.name
+          : <span className="muted">—</span>}
       </td>
 
       <td className="c-brand">

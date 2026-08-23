@@ -258,7 +258,7 @@ function FoodSheet({
                   className={`food-row${item.qty > 0 ? '' : ' bare'}`}
                   onClick={() => setPicked(item)}
                 >
-                  <span className="food-row-name">{item.name}</span>
+                  <span className="food-row-name">{item.displayName}</span>
                   <span className="food-row-meta">
                     {placeEmoji(places, item.location)} {placeLabel(places, item.location)}
                   </span>
