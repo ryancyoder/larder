@@ -2136,7 +2136,8 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
    category emoji stands in until a picture is fetched. */
 .cat-table .c-pic { width: 1%; padding-right: 8px; }
 .cat-table .c-food,
-.cat-table .c-brand {
+.cat-table .c-brand,
+.cat-table .c-store {
   white-space: nowrap;
   font-size: 12.5px;
   color: var(--text-dim);
@@ -2160,11 +2161,6 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
    heading is spelled out wherever it fits. "OFF" reads as off/on, which was the
    first question anyone asked of this table. */
 .cat-table .c-off { width: 1%; text-align: center; }
-.cat-table .c-off-abbr { display: none; }
-@media (max-width: 780px) {
-  .cat-table .c-off-full { display: none; }
-  .cat-table .c-off-abbr { display: inline; }
-}
 
 .cat-legend {
   display: flex;
@@ -2223,6 +2219,12 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
 }
 @media (max-width: 940px) {
   .cat-table .c-brand { display: none; }
+}
+@media (max-width: 700px) {
+  /* The item number is meaningless without the shop that issued it, so on the
+     way down they go together — store first, since the number is the identifier
+     someone actually looks for. */
+  .cat-table .c-store { display: none; }
 }
 @media (max-width: 860px) {
   .cat-table .c-size { display: none; }

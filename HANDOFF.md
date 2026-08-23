@@ -83,8 +83,12 @@ The complaint that motivated this table was really about duplicates, not disappe
 - `lib/products.ts` holds the logic: `productByCode`, `upsertProduct` (fills gaps, never
   overwrites — a name from a person or from Open Food Facts beats a till abbreviation, and
   re-importing an old receipt must not undo either), `learnBarcode`, `recordPurchase`.
-- **The Catalog tab** browses it — Picture / Product / Brand / Food / Category / SKU /
-  Barcode / Open Food Facts / Size / Price each, with filters for *To scan* and *Scanned*.
+- **The Catalog tab** browses it — Picture / Product / Brand / Food / Category / Store /
+  SKU / Barcode / FF / Size / Price each, with filters for *To scan* and *Scanned*.
+  **Store is its own column**, immediately before SKU: a till code means nothing without the
+  shop that issued it, so they sit together and drop together. The Open Food Facts column is
+  headed **FF**, with the legend under the toolbar spelling it out — a column read down
+  wants a short head, and the earlier full-width heading cost more room than it earned.
   **The Catalog hides the nav** (`.app.focused`, driven by `FULL_WIDTH` in `App.tsx`) and
   carries its own Back button instead. That is not cosmetic: the rail is 216px, which on a
   landscape iPad is the difference between nine columns and all ten. Back returns to the tab
