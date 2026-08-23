@@ -85,6 +85,9 @@ The complaint that motivated this table was really about duplicates, not disappe
   re-importing an old receipt must not undo either), `learnBarcode`, `recordPurchase`.
 - **The Catalog tab** browses it — Picture / Product / Brand / Food / Category / Store /
   SKU / Barcode / FF / Size / Price each, with filters for *To scan* and *Scanned*.
+  The **Product** column is the friendly name and **Catalog name** beside it is the source's
+  own wording, shown only when the two differ; both sort. Tapping the picture opens a sheet
+  where either the name or the photo can be replaced.
   **Store is its own column**, immediately before SKU: a till code means nothing without the
   shop that issued it, so they sit together and drop together. The Open Food Facts column is
   headed **FF**, with the legend under the toolbar spelling it out — a column read down
@@ -95,6 +98,31 @@ The complaint that motivated this table was really about duplicates, not disappe
   you came from, not always the Kitchen.
   Every breakpoint sits *below* 1180 — a `max-width: 1180px` rule fires on the exact device
   this is built for, which had silently hidden two columns once already.
+
+### Two names per product, and everything else derives from them
+
+`products.name` is **what the source called it** — Open Food Facts writes the full label
+(brand, variant, pack size, all of it) and a till writes 22 characters of consonants. Both
+are kept: they are what the record said, and they are how a product is found again.
+
+`products.display_name` (`0008`) is **the short one, for reading on a shelf**. Derived by
+`friendlyName()` rather than typed, and overridable in the Catalog when the derivation gets
+it wrong. Null means nobody has derived one, so **`productName(product)` is the only correct
+way to read a name** — it falls back, and forgetting that shows a blank where a product
+should be.
+
+`friendlyName()` is deliberately conservative. It removes only what is demonstrably not part
+of what the food *is* — a brand prefix, since the brand has its own column, and trailing
+size clauses — and **never rewords anything**: a derivation that paraphrased would produce
+names nobody chose and nobody could search for. It returns the original whenever tidying
+would leave too little, including when the remainder is only a size. That last guard exists
+because a test caught "Oat 16 oz" minus the brand "Oat" becoming **"16 oz"** — long enough
+to pass a length check and useless on a shelf.
+
+**`ItemView.displayName` resolves it** the same way `displayPhotoId` resolves the picture:
+the catalogue's name where there is one, the item's own otherwise. The Kitchen table and
+tiles, Quick add, Reserved, Foods and the trip sheet all read that. `item.name` still means
+what that particular purchase was called.
 
 ### Product photos are the master, and everything else derives from them
 

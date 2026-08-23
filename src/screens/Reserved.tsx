@@ -119,7 +119,7 @@ function HeldRow({ held, people, onRelease }: { held: Held; people: Person[]; on
     <div className="item">
       <span style={{ fontSize: 20, flex: 'none' }} aria-hidden>{meta.emoji}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div className="name">{item.name}</div>
+        <div className="name">{item.displayName}</div>
         <div className="meta">
           <span
             className="cat-dot"

@@ -1,6 +1,7 @@
 import { useLiveQuery } from './live'
 import { db } from '../db/db'
 import { buildViews } from '../lib/inventory'
+import { productName } from '../lib/products'
 import { sortPlaces } from '../lib/locations'
 import { setCategoryRegistry, sortCategories } from '../lib/categories'
 import { sortPeople } from '../lib/people'
@@ -10,32 +11,39 @@ import type {
 
 /** Live views over IndexedDB. Every screen reads through these, never the tables directly. */
 
-/** Master reference photos, keyed by product. See `ItemView.displayPhotoId`. */
-async function productPhotos(): Promise<Map<number, number>> {
+/**
+ * What the catalogue says each product is called and looks like.
+ *
+ * One query feeding `buildViews`, so a kitchen full of tiles resolves its names
+ * and pictures without every row subscribing to the products table.
+ */
+async function catalogue(): Promise<Map<number, { name?: string; photoId?: number }>> {
   const rows = await db.products.toArray()
-  const out = new Map<number, number>()
-  for (const p of rows) if (p.id != null && p.photoId != null) out.set(p.id, p.photoId)
+  const out = new Map<number, { name?: string; photoId?: number }>()
+  for (const p of rows) {
+    if (p.id != null) out.set(p.id, { name: productName(p), photoId: p.photoId })
+  }
   return out
 }
 
 export function useKitchen(): ItemView[] | undefined {
   return useLiveQuery(async () => {
-    const [items, reservations, photos] = await Promise.all([
+    const [items, reservations, index] = await Promise.all([
       db.items.toArray(),
       db.reservations.toArray(),
-      productPhotos(),
+      catalogue(),
     ])
-    return buildViews(items.filter((i) => !i.archived), reservations, photos)
+    return buildViews(items.filter((i) => !i.archived), reservations, index)
   }, [])
 }
 
 /** Includes used-up staples (qty 0) so the shopping list can rebuy them. */
 export function useAllStock(): ItemView[] | undefined {
   return useLiveQuery(async () => {
-    const [items, reservations, photos] = await Promise.all([
-      db.items.toArray(), db.reservations.toArray(), productPhotos(),
+    const [items, reservations, index] = await Promise.all([
+      db.items.toArray(), db.reservations.toArray(), catalogue(),
     ])
-    return buildViews(items, reservations, photos)
+    return buildViews(items, reservations, index)
   }, [])
 }
 
@@ -97,12 +105,12 @@ export function useTrips(): Trip[] | undefined {
 export function useTripItems(tripId: number | undefined): ItemView[] | undefined {
   return useLiveQuery(async () => {
     if (tripId == null) return []
-    const [items, reservations, photos] = await Promise.all([
+    const [items, reservations, index] = await Promise.all([
       db.items.where('tripId').equals(tripId).toArray(),
       db.reservations.toArray(),
-      productPhotos(),
+      catalogue(),
     ])
-    return buildViews(items, reservations, photos)
+    return buildViews(items, reservations, index)
   }, [tripId])
 }
 

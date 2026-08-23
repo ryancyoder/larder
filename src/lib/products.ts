@@ -26,6 +26,71 @@ import { unitPrice } from './inventory'
  * whatever was new that week.
  */
 
+// ---------------------------------------------------------------------------
+// The friendly name
+// ---------------------------------------------------------------------------
+
+/**
+ * Trailing clauses that describe the packet rather than the food: a size, a
+ * pack count, a net weight. Open Food Facts puts them in the name because the
+ * name is the label, and the label has to carry them.
+ */
+const SIZE_CLAUSE = /^\s*\d+(?:\.\d+)?\s*(?:fl\.?\s?oz|oz|lb|lbs|g|kg|ml|l|ct|count|pk|pack|pc|pcs|gal|qt)\b\.?\s*$/i
+
+/**
+ * A short name for a shelf, out of the long one on a label.
+ *
+ * Conservative on purpose. It only removes things that are demonstrably not
+ * part of what the food *is* — the brand, which the catalogue stores
+ * separately, and trailing size clauses — and never rewords anything. A
+ * derivation that paraphrased would produce names nobody chose and nobody
+ * could search for.
+ *
+ * Returns the original whenever tidying would leave too little behind: half a
+ * name is worse than a long one.
+ */
+export function friendlyName(name: string, brand?: string): string {
+  let out = name.trim().replace(/\s+/g, ' ')
+  if (!out) return name
+
+  // The brand is its own column; repeating it in the name is noise.
+  if (brand) {
+    const b = brand.trim()
+    if (b && out.toLowerCase().startsWith(b.toLowerCase() + ' ')) {
+      out = out.slice(b.length).trim()
+    }
+  }
+
+  // "Coca-Cola Classic, 12 pk, 12 fl oz" → drop the trailing measurements.
+  const parts = out.split(',').map((p) => p.trim()).filter(Boolean)
+  while (parts.length > 1 && SIZE_CLAUSE.test(parts[parts.length - 1])) parts.pop()
+  out = parts.join(', ')
+
+  // A trailing parenthetical is nearly always packaging or a translation.
+  out = out.replace(/\s*\([^)]*\)\s*$/, '').trim()
+
+  // A bare size left on the end after all that.
+  out = out.replace(
+    /[,\s]+\d+(?:\.\d+)?\s*(?:fl\.?\s?oz|oz|lb|lbs|g|kg|ml|l|ct|pk|pack|gal|qt)\.?$/i,
+    '',
+  ).trim()
+
+  // A result that is only a size is not a name — "Oat 16 oz" minus the brand
+  // "Oat" leaves "16 oz", which is long enough to pass a length check and
+  // useless on a shelf. The original is always the safer answer.
+  if (out.length < 3 || SIZE_CLAUSE.test(out) || !/[A-Za-z]{3}/.test(out)) return name.trim()
+  return out
+}
+
+/**
+ * What to call a product on screen. The only correct way to read the name:
+ * `displayName` is optional and `name` is the fallback, and forgetting that
+ * shows a blank where a product should be.
+ */
+export function productName(product: Pick<Product, 'name' | 'displayName'>): string {
+  return product.displayName?.trim() || product.name
+}
+
 /** A till code only identifies a product alongside the shop that issued it. */
 export interface StoreCode {
   store: string
@@ -125,6 +190,7 @@ export async function upsertProduct(draft: ProductDraft): Promise<Product> {
     // has never been asked.
     offStatus: barcode && draft.nutrition ? 'found' : undefined,
     name: draft.name.trim(),
+    displayName: friendlyName(draft.name, draft.brand),
     brand: draft.brand,
     barcode,
     store: sku ? draft.store : undefined,
@@ -172,6 +238,8 @@ export async function learnBarcode(
     // The lookup wins on naming — it knows the product, where the receipt only
     // knew how to abbreviate it into 22 characters.
     patch.name = found.name
+    // Re-derived, because the lookup has just replaced the name it came from.
+    patch.displayName = friendlyName(found.name, found.brand ?? product.brand)
     patch.brand = found.brand ?? product.brand
     patch.category = found.category
     patch.nutrition = found.nutrition ?? product.nutrition
@@ -252,6 +320,7 @@ export async function sweepOpenFoodFacts(
       state.found++
       // Gaps only. The name is deliberately not among them.
       if (!product.brand && found.brand) patch.brand = found.brand
+      if (!product.displayName) patch.displayName = friendlyName(product.name, found.brand ?? product.brand)
       if (!product.nutrition && found.nutrition) patch.nutrition = found.nutrition
       if (product.size == null && found.qty != null) {
         patch.size = found.qty
