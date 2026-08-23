@@ -436,6 +436,13 @@ trigger *and* revisit the join screen.
   the beep is silent the audio unlock needs moving to the button press.
 - **Kitchen header buttons overflow** off the right edge on a narrow phone
   (Unpack / Tiles / Select / Settings). Pre-existing; noticed, not fixed.
+  The bottom nav had the same disease and is now fixed: it is a fixed, centred,
+  non-wrapping pill, so its width is just the sum of its buttons. Seven tabs at a
+  62px minimum came to 444px and hung 27px off each edge of a 390px phone. Below
+  500px the buttons now share the space rather than demanding it, labels
+  ellipsise, and `max-width: calc(100vw - 16px)` with a scroll is the backstop.
+  **If you add an eighth tab, measure it** — the harness in §8 does this in a
+  minute.
 - No test suite beyond `npm test` (`test:receipt` + `test:tripscan`). The `rapid.ts` tests
   were throwaway; these were not.
 

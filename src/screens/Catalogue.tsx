@@ -70,7 +70,7 @@ export default function Catalogue() {
     <>
       <div className="topbar">
         <div>
-          <h1>Catalogue</h1>
+          <h1>Catalog</h1>
           <div className="sub">
             {counts.all} product{counts.all === 1 ? '' : 's'}
             {counts.unscanned > 0 && ` · ${counts.unscanned} never scanned`}
