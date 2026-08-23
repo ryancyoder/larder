@@ -2065,7 +2065,7 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
    --------------------------------------------------------------------------- */
 .cat-table .c-sku,
 .cat-table .c-barcode,
-.cat-table .c-bought {
+.cat-table .c-size {
   white-space: nowrap;
   font-size: 12.5px;
   color: var(--text-dim);
@@ -2076,9 +2076,8 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   letter-spacing: -0.02em;
 }
-.cat-table .c-bought { width: 1%; text-align: right; }
-.cat-table .c-sku small,
-.cat-table .c-bought small {
+.cat-table .c-size { width: 1%; text-align: right; }
+.cat-table .c-sku small {
   display: block;
   font-size: 11px;
   color: var(--text-mute);
@@ -2141,7 +2140,7 @@ input[type='checkbox'] { width: 19px; height: 19px; accent-color: var(--accent);
 .cat-table .krow.spent { opacity: 0.72; }
 
 @media (max-width: 900px) {
-  .cat-table .c-bought { display: none; }
+  .cat-table .c-size { display: none; }
 }
 @media (max-width: 620px) {
   /* Down to what a phone can hold: what it is, its code, and whether the

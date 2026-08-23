@@ -186,6 +186,17 @@ export interface InboxItem {
  * Food Facts. The SKU is stable, though, so scanning the real barcode off the
  * packet **once** teaches this row, and every later receipt carrying that SKU
  * resolves without asking again.
+ *
+ * **Identity only — never quantity.** How often something is bought and what it
+ * cost are facts about purchases, and every purchase is already an `Item`
+ * carrying `productId`, `price` and `purchasedAt`. Counters lived here briefly
+ * and were removed in `0007`: a denormalised copy drifts, and this one had —
+ * `timesBought` was incremented by the line quantity while claiming to count
+ * shops, so two pot pies bought twice read "4×".
+ *
+ * `size`, `sizeUnit` and `unit` are the exception that proves the rule. They say
+ * what the product *is*, not how much of it you have, and do not change when you
+ * buy more.
  */
 export interface Product {
   id?: number
@@ -222,9 +233,6 @@ export interface Product {
    * typed in by hand.
    */
   offStatus?: 'found' | 'missing'
-  timesBought: number
-  lastBoughtAt?: string
-  lastPrice?: number
   createdAt: string
 }
 

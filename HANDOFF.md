@@ -83,11 +83,18 @@ The complaint that motivated this table was really about duplicates, not disappe
 - `lib/products.ts` holds the logic: `productByCode`, `upsertProduct` (fills gaps, never
   overwrites — a name from a person or from Open Food Facts beats a till abbreviation, and
   re-importing an old receipt must not undo either), `learnBarcode`, `recordPurchase`.
-- **The Catalogue tab** browses it — a table of Product / Category / SKU / Barcode / OFF /
-  Bought / Last paid, with filters for *To scan* and *Scanned*. Built for a landscape iPad,
-  which is where several hundred products are readable; the *Bought* column drops under
-  900px and *SKU* under 620px, leaving a phone with what it is, its code, and whether the
-  database knows it.
+- **The Catalog tab** browses it — Product / Category / SKU / Barcode / Open Food Facts /
+  Size, with filters for *To scan* and *Scanned*.
+
+  **The catalogue holds identity, never quantity.** `times_bought`, `last_bought_at` and
+  `last_price` lived here briefly and were dropped in `0007`. Each duplicated something
+  `items` already records per purchase, and the copy had already drifted: `times_bought` was
+  incremented by the line quantity while claiming to count shops, so two pot pies bought
+  twice read "4×". How often and how much are questions about purchases; Trips and Insights
+  answer them from the rows that own them. `size`/`sizeUnit`/`unit` stay because they say
+  what a product *is* and do not change when you buy more. Built for a landscape iPad,
+  which is where several hundred products are readable; *Size* drops under 900px and *SKU*
+  under 620px, leaving a phone with what it is, its code, and whether the database knows it.
 - The Open Food Facts column is **headed with the words**, abbreviated to "OFF" only under
   780px, and carries a visible legend rather than a tooltip. "OFF" alone reads as off/on and
   was the first thing anyone asked about the table; a tooltip does not answer it on a touch
